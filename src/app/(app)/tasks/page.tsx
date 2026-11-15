@@ -5,6 +5,7 @@ import { listAllTasks, listUsers, userMap } from "@/lib/queries";
 import { taskHealth } from "@/lib/stats";
 import { deadlineDistance, fmtDateTime, latenessLabel } from "@/lib/format";
 import { subtaskProgress } from "@/lib/taskViews";
+import { inPeriod, periodTitle, resolvePeriod } from "@/lib/period";
 import { PRIORITIES, STATUSES, type Priority, type Status, type TaskDTO, type UserDTO } from "@/lib/types";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { TaskFilters } from "@/components/tasks/TaskFilters";
@@ -29,15 +30,22 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const priority = one(sp.priority);
   const assignee = one(sp.assignee);
 
+  // Completed tasks are hidden unless asked for, and then limited to one period.
+  // Only admins may move the window to earlier days or weeks.
+  const showDone = one(sp.done) === "1" || status === "done";
+  const period = resolvePeriod(isAdmin ? one(sp.range) : "", isAdmin ? one(sp.at) : "", now);
+
   let tasks: TaskDTO[] = scope === "mine" ? all.filter((t) => t.assignees.includes(user.id) || t.createdBy === user.id) : all;
   if (q) tasks = tasks.filter((t) => t.title.toLowerCase().includes(q) || t.description.toLowerCase().includes(q) || t.tags.some((x) => x.includes(q)));
   if (status === "open") tasks = tasks.filter((t) => t.status !== "done");
   else if (STATUSES.includes(status as Status)) tasks = tasks.filter((t) => t.status === status);
   if (PRIORITIES.includes(priority as Priority)) tasks = tasks.filter((t) => t.priority === priority);
   if (assignee) tasks = tasks.filter((t) => t.assignees.includes(assignee));
+  tasks = tasks.filter((t) => t.status !== "done" || (showDone && inPeriod(t.completedAt ?? t.updatedAt, period)));
 
   const open = tasks.filter((t) => t.status !== "done").length;
   const overdue = tasks.filter((t) => taskHealth(t, now) === "overdue").length;
+  const doneCount = tasks.length - open;
 
   const canEdit = (t: TaskDTO) => isAdmin || t.createdBy === user.id || t.assignees.includes(user.id);
   const cards: KanbanCard[] = tasks.map((t) => {
@@ -54,15 +62,21 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
     };
   });
 
+  const columns: Status[] = showDone ? STATUSES : STATUSES.filter((s) => s !== "done");
+
   return (
     <div>
       <PageHeader
         title="Tasks"
-        subtitle={`${open} open${overdue > 0 ? ` · ${overdue} overdue` : ""} · ${tasks.length - open} completed`}
+        subtitle={`${open} open${overdue > 0 ? ` · ${overdue} overdue` : ""}${showDone ? ` · ${doneCount} completed (${period.label.toLowerCase()})` : ""}`}
         actions={<Link href="/tasks/new" className="btn btn-primary"><Plus className="size-4" />New task</Link>}
       />
-      <TaskFilters users={users} isAdmin={isAdmin} />
-      {view === "board" ? <KanbanBoard key={tasks.map((t) => t.id + t.status).join("|")} cards={cards} /> : <TaskGroups tasks={tasks} users={umap} now={now} />}
+      <TaskFilters users={users} isAdmin={isAdmin} period={period} showDone={showDone} />
+      {view === "board" ? (
+        <KanbanBoard key={tasks.map((t) => t.id + t.status).join("|") + columns.length} cards={cards} columns={columns} doneLabel={period.label} />
+      ) : (
+        <TaskGroups tasks={tasks} users={umap} now={now} collapseDone={false} doneHint={`${periodTitle(period)} · most recent first`} />
+      )}
     </div>
   );
 }

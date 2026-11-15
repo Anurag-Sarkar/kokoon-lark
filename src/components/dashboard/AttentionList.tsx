@@ -3,7 +3,7 @@ import { ArrowRight } from "lucide-react";
 import { taskHealth } from "@/lib/stats";
 import { deadlineDistance, fmtDateTime } from "@/lib/format";
 import type { TaskDTO, UserDTO } from "@/lib/types";
-import { AvatarStack } from "@/components/ui/Avatar";
+import { OwnerList } from "@/components/ui/Avatar";
 import { HealthPill, PriorityMark } from "@/components/ui/Pills";
 import { EmptyState } from "@/components/shell/PageHeader";
 
@@ -37,7 +37,7 @@ export function AttentionList({ tasks, users, now, title = "Needs your attention
                     <div className="text-sm font-medium line-clamp-2 leading-snug">{t.title}</div>
                     <div className="text-[11px] text-ink-3">{fmtDateTime(t.deadline, now)}</div>
                   </div>
-                  <AvatarStack users={owners} size="xs" />
+                  <OwnerList users={owners} size="xs" className="hidden sm:inline-flex max-w-[220px] justify-end" />
                   <HealthPill health={h} label={d.label} />
                   <ArrowRight className="size-3.5 text-ink-3 shrink-0" />
                 </Link>

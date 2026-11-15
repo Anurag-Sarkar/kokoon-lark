@@ -4,7 +4,7 @@ import { taskHealth } from "@/lib/stats";
 import { deadlineDistance, fmtDateTime, latenessLabel } from "@/lib/format";
 import { subtaskProgress } from "@/lib/taskViews";
 import type { TaskDTO, UserDTO } from "@/lib/types";
-import { AvatarStack } from "@/components/ui/Avatar";
+import { OwnerList } from "@/components/ui/Avatar";
 import { HealthPill, PriorityMark, StatusPill, Tag } from "@/components/ui/Pills";
 
 export function TaskRow({ task, users, now, showOwners = true }: { task: TaskDTO; users: Map<string, UserDTO>; now: Date; showOwners?: boolean }) {
@@ -24,6 +24,7 @@ export function TaskRow({ task, users, now, showOwners = true }: { task: TaskDTO
           <span className={h === "overdue" ? "text-critical-text font-semibold" : h === "due_soon" ? "text-warn-text font-semibold" : ""}>{deadlineText}</span>
           {task.deadlineChanges.length > 0 && <span>· moved {task.deadlineChanges.length}×</span>}
           {task.tags.slice(0, 3).map((t) => <Tag key={t}>{t}</Tag>)}
+          {showOwners && <span className="sm:hidden basis-full text-ink-2">{owners.length ? owners.map((u) => u.name).join(", ") : "Unassigned"}</span>}
         </div>
       </div>
       {prog.total > 0 ? (
@@ -31,7 +32,7 @@ export function TaskRow({ task, users, now, showOwners = true }: { task: TaskDTO
           <CheckSquare className="size-3.5" />{prog.done}/{prog.total}
         </span>
       ) : <span className="hidden sm:block" />}
-      {showOwners ? <span className="hidden sm:inline-flex"><AvatarStack users={owners} size="sm" /></span> : <span className="hidden sm:block" />}
+      {showOwners ? <span className="hidden sm:flex justify-end max-w-[280px]"><OwnerList users={owners} size="xs" className="justify-end" /></span> : <span className="hidden sm:block" />}
       <span className="justify-self-end">{isDone ? <HealthPill health={h} /> : h === "on_track" ? <StatusPill status={task.status} /> : <HealthPill health={h} label={dist.label} />}</span>
     </Link>
   );

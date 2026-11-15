@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { CheckSquare, GripVertical } from "lucide-react";
+import { CheckCircle2, CheckSquare, GripVertical } from "lucide-react";
 import { setTaskStatus } from "@/lib/actions";
 import { STATUSES, STATUS_LABEL, type Priority, type Status } from "@/lib/types";
 import { useAction } from "@/components/useAction";
-import { AvatarStack } from "@/components/ui/Avatar";
+import { OwnerList } from "@/components/ui/Avatar";
 import { PriorityMark } from "@/components/ui/Pills";
 
 export interface KanbanCard {
@@ -30,39 +30,39 @@ const TONE: Record<KanbanCard["deadlineTone"], string> = {
   done_late: "text-critical-text",
 };
 
-export function KanbanBoard({ cards: initial }: { cards: KanbanCard[] }) {
+export function KanbanBoard({ cards: initial, columns = STATUSES, doneLabel }: { cards: KanbanCard[]; columns?: Status[]; doneLabel?: string }) {
   const [cards, setCards] = useState(initial);
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<Status | null>(null);
   const { run, error } = useAction();
+  const hasDone = columns.includes("done");
 
   const move = (id: string, status: Status) => {
     const card = cards.find((c) => c.id === id);
     if (!card || card.status === status || !card.canEdit) return;
-    const prev = cards;
     setCards((cs) => cs.map((c) => (c.id === id ? { ...c, status } : c)));
     run(() => setTaskStatus(id, status), undefined);
-    // revert on failure handled via error display; keep optimistic otherwise
-    void prev;
   };
+
+  const dropHandlers = (status: Status) => ({
+    onDragOver: (e: React.DragEvent) => { e.preventDefault(); if (over !== status) setOver(status); },
+    onDragLeave: () => setOver(null),
+    onDrop: (e: React.DragEvent) => { e.preventDefault(); setOver(null); const id = e.dataTransfer.getData("text/plain") || dragging; if (id) move(id, status); setDragging(null); },
+  });
 
   return (
     <div>
       {error && <p className="mb-3 text-sm text-critical-text bg-critical-soft rounded-lg px-3 py-2">{error}</p>}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-        {STATUSES.map((status) => {
+      <div className={`grid grid-cols-1 md:grid-cols-2 ${columns.length >= 4 ? "xl:grid-cols-4" : "xl:grid-cols-3"} gap-3`}>
+        {columns.map((status) => {
           const col = cards.filter((c) => c.status === status);
           return (
-            <div
-              key={status}
-              className="kanban-col rounded-2xl bg-surface-2 border border-line p-2.5 transition-colors"
-              data-over={over === status}
-              onDragOver={(e) => { e.preventDefault(); if (over !== status) setOver(status); }}
-              onDragLeave={() => setOver(null)}
-              onDrop={(e) => { e.preventDefault(); setOver(null); const id = e.dataTransfer.getData("text/plain") || dragging; if (id) move(id, status); setDragging(null); }}
-            >
+            <div key={status} className="kanban-col rounded-2xl bg-surface-2 border border-line p-2.5 transition-colors" data-over={over === status} {...dropHandlers(status)}>
               <div className="flex items-center justify-between px-1.5 py-1 mb-2">
-                <span className="text-xs font-semibold text-ink-2">{STATUS_LABEL[status]}</span>
+                <span className="text-xs font-semibold text-ink-2">
+                  {STATUS_LABEL[status]}
+                  {status === "done" && doneLabel && <span className="text-ink-3 font-normal"> · {doneLabel}</span>}
+                </span>
                 <span className="text-xs text-ink-3 tnum">{col.length}</span>
               </div>
               <div className="grid gap-2">
@@ -82,9 +82,9 @@ export function KanbanBoard({ cards: initial }: { cards: KanbanCard[] }) {
                       </div>
                       <PriorityMark priority={c.priority} />
                     </div>
-                    <div className="mt-2.5 flex items-center justify-between gap-2">
-                      <AvatarStack users={c.owners} size="xs" />
-                      <div className="flex items-center gap-2">
+                    <div className="mt-2.5 flex items-end justify-between gap-2">
+                      <OwnerList users={c.owners} size="xs" className="min-w-0" />
+                      <div className="flex items-center gap-2 shrink-0">
                         {c.subTotal > 0 && <span className="inline-flex items-center gap-1 text-[11px] text-ink-3 tnum"><CheckSquare className="size-3" />{c.subDone}/{c.subTotal}</span>}
                         {c.canEdit && (
                           <select value={c.status} onChange={(e) => move(c.id, e.target.value as Status)} className="select h-6 w-auto py-0 pl-1.5 pr-6 text-[11px] rounded-md" aria-label="Move to">
@@ -101,6 +101,15 @@ export function KanbanBoard({ cards: initial }: { cards: KanbanCard[] }) {
           );
         })}
       </div>
+      {!hasDone && (
+        <div
+          {...dropHandlers("done")}
+          className={`mt-3 rounded-2xl border-2 border-dashed px-4 py-3 flex items-center justify-center gap-2 text-xs font-semibold transition-colors ${over === "done" ? "border-good bg-good-soft text-good-text" : dragging ? "border-line-2 bg-surface text-ink-2" : "border-line text-ink-3"}`}
+        >
+          <CheckCircle2 className="size-4" />
+          {dragging ? "Drop here to mark as done" : "Completed tasks are hidden · drag a card here to mark it done, or turn on “Completed” above"}
+        </div>
+      )}
     </div>
   );
 }
