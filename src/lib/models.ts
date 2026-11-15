@@ -24,6 +24,16 @@ export interface SessionDoc {
   createdAt: Date;
 }
 
+export interface TeamDoc {
+  _id: Types.ObjectId;
+  name: string;
+  description: string;
+  color: string;
+  members: Types.ObjectId[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface SubtaskDoc {
   _id: Types.ObjectId;
   title: string;
@@ -103,6 +113,17 @@ const SessionSchema = new Schema<SessionDoc>(
 );
 SessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
+const TeamSchema = new Schema<TeamDoc>(
+  {
+    name: { type: String, required: true, trim: true },
+    description: { type: String, default: "" },
+    color: { type: String, default: "#2a78d6" },
+    members: [{ type: Schema.Types.ObjectId, ref: "User" }],
+  },
+  { timestamps: true }
+);
+TeamSchema.index({ members: 1 });
+
 const SubtaskSchema = new Schema<SubtaskDoc>({
   title: { type: String, required: true, trim: true },
   isDone: { type: Boolean, default: false },
@@ -175,3 +196,6 @@ export const Session: Model<SessionDoc> =
 
 export const Task: Model<TaskDoc> =
   (mongoose.models.Task as Model<TaskDoc>) ?? mongoose.model<TaskDoc>("Task", TaskSchema);
+
+export const Team: Model<TeamDoc> =
+  (mongoose.models.Team as Model<TeamDoc>) ?? mongoose.model<TeamDoc>("Team", TeamSchema);

@@ -1,7 +1,7 @@
 /* Seeds a realistic team with ~8 weeks of task history. Run: npm run seed */
 import bcrypt from "bcryptjs";
 import mongoose, { Types } from "mongoose";
-import { Session, Task, User } from "../src/lib/models";
+import { Session, Task, Team, User } from "../src/lib/models";
 
 const URI = process.env.MONGODB_URI ?? "mongodb://127.0.0.1:27017/kokoon-task";
 const NOW = new Date();
@@ -35,7 +35,7 @@ type Seed = {
 async function main() {
   await mongoose.connect(URI);
   console.log(`Connected to ${URI}`);
-  await Promise.all([User.deleteMany({}), Task.deleteMany({}), Session.deleteMany({})]);
+  await Promise.all([User.deleteMany({}), Task.deleteMany({}), Team.deleteMany({}), Session.deleteMany({})]);
 
   const pw = async (p: string) => bcrypt.hash(p, 10);
   const people = [
@@ -54,6 +54,11 @@ async function main() {
     ids[p.key] = u._id;
     names[p.key] = p.name;
   }
+
+  await Team.insertMany([
+    { name: "Product", description: "Design and engineering", color: "#2a78d6", members: [ids.priya, ids.rohan, ids.sara] },
+    { name: "Growth & Ops", description: "Marketing, sales and operations", color: "#eb6834", members: [ids.dev, ids.meera] },
+  ]);
 
   const seeds: Seed[] = [
     /* ---------- Priya: strong performer ---------- */
@@ -168,7 +173,7 @@ async function main() {
   });
 
   await Task.insertMany(docs);
-  console.log(`Seeded ${people.length} people and ${docs.length} tasks.`);
+  console.log(`Seeded ${people.length} people in 2 teams and ${docs.length} tasks.`);
   console.log("Admin login:  admin@kokoon.ai / admin123");
   console.log("Member login: priya@kokoon.ai / password123 (same password for rohan, sara, dev, meera)");
   await mongoose.disconnect();

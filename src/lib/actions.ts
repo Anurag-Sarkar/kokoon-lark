@@ -7,7 +7,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SESSION_COOKIE, createSession, destroySession, getCurrentUser } from "./auth";
 import { connectDB } from "./mongodb";
-import { Task, User, type TaskDoc } from "./models";
+import { Task, Team, User, type TaskDoc } from "./models";
 import { isValidId } from "./queries";
 import { PRIORITIES, STATUSES, STATUS_LABEL, type ActionResult, type ActivityType, type Priority, type Role, type Status, type UserDTO } from "./types";
 import { fmtShortDateTime, shiftLabel } from "./format";
@@ -19,6 +19,9 @@ const AVATAR_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#
 function fail(error: string): ActionResult {
   return { ok: false, error };
 }
+
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const isHexColor = (s: string) => /^#[0-9a-f]{6}$/i.test(s);
 
 function revalidateAll() {
   revalidatePath("/", "layout");
@@ -340,11 +343,13 @@ export async function createUser(_prev: FormState, formData: FormData): Promise<
   await connectDB();
   if (await User.exists({ email })) return { error: "Someone with that email already exists." };
   const count = await User.countDocuments();
-  await User.create({
+  const created = await User.create({
     name, email, title, role,
     passwordHash: await bcrypt.hash(password, 10),
     color: AVATAR_COLORS[count % AVATAR_COLORS.length],
   });
+  const teamIds = formData.getAll("teams").map(String).filter(isValidId);
+  if (teamIds.length > 0) await Team.updateMany({ _id: { $in: teamIds } }, { $addToSet: { members: created._id } });
   revalidateAll();
   return {};
 }
@@ -378,5 +383,64 @@ export async function resetPassword(userId: string, password: string): Promise<A
   if (!isValidId(userId)) return fail("User not found.");
   await connectDB();
   await User.updateOne({ _id: userId }, { $set: { passwordHash: await bcrypt.hash(password, 10) } });
+  return { ok: true };
+}
+
+/* ---------------- teams ---------------- */
+
+export async function createTeam(_prev: FormState, formData: FormData): Promise<FormState> {
+  const actor = await requireActor();
+  if (actor.role !== "admin") return { error: "Admins only." };
+  const name = String(formData.get("name") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim();
+  const color = String(formData.get("color") ?? "").trim();
+  const members = formData.getAll("members").map(String).filter(isValidId);
+  if (name.length < 2) return { error: "Give the team a name." };
+
+  await connectDB();
+  if (await Team.exists({ name: new RegExp(`^${escapeRegex(name)}$`, "i") })) return { error: "A team with that name already exists." };
+  const count = await Team.countDocuments();
+  const team = await Team.create({
+    name, description,
+    color: isHexColor(color) ? color : AVATAR_COLORS[count % AVATAR_COLORS.length],
+    members: members.map((m) => new Types.ObjectId(m)),
+  });
+  revalidateAll();
+  redirect(`/admin/teams/${team._id.toString()}`);
+}
+
+export async function updateTeam(teamId: string, name: string, description: string, color: string): Promise<ActionResult> {
+  const actor = await requireActor();
+  if (actor.role !== "admin") return fail("Admins only.");
+  if (!isValidId(teamId)) return fail("Team not found.");
+  const cleanName = name.trim();
+  if (cleanName.length < 2) return fail("Give the team a name.");
+  await connectDB();
+  if (await Team.exists({ _id: { $ne: teamId }, name: new RegExp(`^${escapeRegex(cleanName)}$`, "i") })) return fail("A team with that name already exists.");
+  const update: Record<string, string> = { name: cleanName, description: description.trim() };
+  if (isHexColor(color)) update.color = color;
+  await Team.updateOne({ _id: teamId }, { $set: update });
+  revalidateAll();
+  return { ok: true };
+}
+
+export async function setTeamMembers(teamId: string, userIds: string[]): Promise<ActionResult> {
+  const actor = await requireActor();
+  if (actor.role !== "admin") return fail("Admins only.");
+  if (!isValidId(teamId)) return fail("Team not found.");
+  await connectDB();
+  const valid = await User.find({ _id: { $in: userIds.filter(isValidId) } }).select("_id").lean();
+  await Team.updateOne({ _id: teamId }, { $set: { members: valid.map((u) => u._id) } });
+  revalidateAll();
+  return { ok: true };
+}
+
+export async function deleteTeam(teamId: string): Promise<ActionResult> {
+  const actor = await requireActor();
+  if (actor.role !== "admin") return fail("Admins only.");
+  if (!isValidId(teamId)) return fail("Team not found.");
+  await connectDB();
+  await Team.deleteOne({ _id: teamId });
+  revalidateAll();
   return { ok: true };
 }

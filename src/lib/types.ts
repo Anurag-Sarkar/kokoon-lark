@@ -30,6 +30,15 @@ export interface UserDTO {
   createdAt: string;
 }
 
+export interface TeamDTO {
+  id: string;
+  name: string;
+  description: string;
+  color: string;
+  members: string[];
+  createdAt: string;
+}
+
 export interface SubtaskDTO {
   id: string;
   title: string;

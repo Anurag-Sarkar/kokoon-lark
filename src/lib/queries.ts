@@ -1,8 +1,8 @@
 import { Types } from "mongoose";
 import { connectDB } from "./mongodb";
-import { Task, User } from "./models";
-import { toTaskDTO, toUserDTO } from "./serialize";
-import type { TaskDTO, UserDTO } from "./types";
+import { Task, Team, User } from "./models";
+import { toTaskDTO, toTeamDTO, toUserDTO } from "./serialize";
+import type { TaskDTO, TeamDTO, UserDTO } from "./types";
 
 export const isValidId = (id: string): boolean => Types.ObjectId.isValid(id) && String(new Types.ObjectId(id)) === id;
 
@@ -18,6 +18,19 @@ export async function getUser(id: string): Promise<UserDTO | null> {
   await connectDB();
   const u = await User.findById(id).lean();
   return u ? toUserDTO(u) : null;
+}
+
+export async function listTeams(): Promise<TeamDTO[]> {
+  await connectDB();
+  const teams = await Team.find({}).sort({ name: 1 }).lean();
+  return teams.map(toTeamDTO);
+}
+
+export async function getTeam(id: string): Promise<TeamDTO | null> {
+  if (!isValidId(id)) return null;
+  await connectDB();
+  const t = await Team.findById(id).lean();
+  return t ? toTeamDTO(t) : null;
 }
 
 export async function listAllTasks(): Promise<TaskDTO[]> {

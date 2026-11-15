@@ -11,7 +11,7 @@ Requirements: Node 20+ and a MongoDB instance (local `mongod`, Docker, or Atlas)
 ```bash
 npm install
 cp .env.example .env.local        # edit MONGODB_URI if MongoDB isn't on localhost:27017
-npm run seed                      # creates a demo team with 8 weeks of history (wipes existing data)
+npm run seed                      # creates 6 demo people in 2 teams with 8 weeks of history (wipes existing data)
 npm run dev                       # http://localhost:3000
 ```
 
@@ -34,7 +34,14 @@ Production: `npm run build && npm start`. Set `MONGODB_URI` in the environment.
 - Status flow: To do → In progress → In review → Done. Completion time is recorded.
 - Subtasks with a progress bar, comments, and a full activity timeline.
 - List view grouped by Overdue / Due today / This week / Later / Completed, plus a drag-and-drop board.
-- Search and filters by status, priority, owner, and "my tasks" vs "everyone".
+- Owners are always shown by full name, never just initials.
+- Completed tasks stay out of the way: the board and list hide them until you turn on **Completed**, and then show only the current week. Admins can switch to a single day and step back through earlier days or weeks.
+- Search and filters by status, priority and owner. Scope is **My tasks** / **My team** for members and **My tasks** / **Team** / **Everyone** for admins.
+
+**Teams**
+- Admins create teams, pick a colour, and add or remove people (also from the add-person form).
+- Members see their team's work on the task list and board, and their Team pulse compares them with their teammates rather than the whole company. Someone in no team sees only their own tasks.
+- The admin overview ranks every team by a team ownership score (the average of its members' scores) with open, overdue, done-this-week and on-time figures; clicking a team opens its own overview with people table, charts and overdue list.
 
 **Deadlines**
 - Changing a deadline requires a written reason. Old date, new date, who, why, and when are stored on the task and shown in the task's deadline history.
@@ -45,10 +52,11 @@ Production: `npm run build && npm start`. Set `MONGODB_URI` in the environment.
 - Ownership score (0–100) shown as a ring, with a label: Crushing it, On track, Slipping, Lagging, or Idle, and a one-line verdict in plain language.
 - Tiles for open, overdue, due in 48h, done on time, done late.
 - "Needs your attention" list, weekly completions chart (on time vs late), and the full task list.
-- Team pulse: everyone's score and status side by side.
+- Team pulse: your teammates' scores and status side by side (everyone, for admins).
 
 **Admin** (team overview)
-- Team totals, sortable people table with every stat, workload chart, team completion trend.
+- Team totals, team-by-team cards, sortable people table with every stat, workload chart, team completion trend.
+- Per-team drill-down: team score and verdict, tiles, members ranked by score, charts, overdue list, and member management.
 - Per-person drill-down with their dashboard, their deadline changes, and their tasks.
 - Deadline log across the whole team with reasons and per-person counts.
 - People management: add, set role, deactivate, reset password.
@@ -79,10 +87,12 @@ If someone has open tasks and no activity for 7+ days they are shown as **Idle**
 ```
 src/app/(app)/dashboard        personal dashboard
 src/app/(app)/tasks            list + board, new task, task detail
-src/app/(app)/admin            team overview, people, person detail, deadline log
-src/lib/models.ts              Mongoose schemas (User, Session, Task with embedded subtasks/comments/changes/activity)
+src/app/(app)/admin            team overview, teams + team detail, people, person detail, deadline log
+src/lib/models.ts              Mongoose schemas (User, Session, Team, Task with embedded subtasks/comments/changes/activity)
 src/lib/actions.ts             all mutations (server actions) with permission checks
 src/lib/stats.ts               task health, ownership score, weekly buckets, team aggregates
+src/lib/teams.ts               team membership helpers and per-team summaries
+src/lib/period.ts              day / week window used for completed tasks
 src/lib/queries.ts             reads, returning plain DTOs
 scripts/seed.ts                demo data generator
 ```

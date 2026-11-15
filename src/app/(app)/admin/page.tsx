@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
-import { listAllTasks, listUsers, userMap } from "@/lib/queries";
+import { listAllTasks, listTeams, listUsers, userMap } from "@/lib/queries";
+import { summarizeTeam } from "@/lib/teams";
 import { computeTeamStats, taskHealth } from "@/lib/stats";
 import { pct, timeAgo } from "@/lib/format";
 import { PageHeader, SectionTitle } from "@/components/shell/PageHeader";
@@ -8,15 +9,17 @@ import { StatTile } from "@/components/ui/StatTile";
 import { WeeklyCompletionsChart } from "@/components/charts/WeeklyCompletionsChart";
 import { WorkloadChart } from "@/components/charts/WorkloadChart";
 import { PeopleTable, type PersonRow } from "@/components/admin/PeopleTable";
+import { TeamCard } from "@/components/admin/TeamCard";
 import { TaskRow } from "@/components/tasks/TaskRow";
 import { EmptyState } from "@/components/shell/PageHeader";
 
 export default async function AdminPage() {
   await requireAdmin();
   const now = new Date();
-  const [users, tasks] = await Promise.all([listUsers(), listAllTasks()]);
+  const [users, tasks, teams] = await Promise.all([listUsers(), listAllTasks(), listTeams()]);
   const umap = userMap(users);
   const team = computeTeamStats(users, tasks, now);
+  const teamSummaries = teams.map((t) => summarizeTeam(t, users, tasks, now)).sort((a, b) => (a.score ?? 101) - (b.score ?? 101));
   const delta = team.completedThisWeek - team.completedLastWeek;
 
   const rows: PersonRow[] = team.people.map((p) => {
@@ -45,6 +48,15 @@ export default async function AdminPage() {
         <StatTile label="On-time rate (30d)" value={pct(team.onTimeRate30)} tone={team.onTimeRate30 !== null && team.onTimeRate30 < 0.7 ? "critical" : "good"} hint={`${team.doneOnTime30} on time · ${team.doneLate30} late`} />
         <StatTile label="Deadline moves (30d)" value={team.deadlineMoves30} tone={team.deadlineMoves30 >= 4 ? "warn" : "neutral"} hint="every one has a reason" />
       </div>
+
+      <section>
+        <SectionTitle hint="How each team is doing, weakest first. Click a team for the detail." action={<Link href="/admin/teams" className="text-xs font-semibold text-accent-deep hover:underline">Manage teams →</Link>}>Teams</SectionTitle>
+        {teamSummaries.length === 0 ? (
+          <EmptyState title="No teams yet" body="Create teams under Manage teams to see team-level performance here." />
+        ) : (
+          <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">{teamSummaries.map((s) => <TeamCard key={s.team.id} summary={s} />)}</div>
+        )}
+      </section>
 
       <section>
         <SectionTitle hint="Lowest ownership score first. Click a column to sort, a name to drill in.">People</SectionTitle>

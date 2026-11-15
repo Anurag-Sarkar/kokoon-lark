@@ -35,6 +35,11 @@ export const LEVEL_META: Record<Level, { label: string; tone: "good" | "accent" 
   no_tasks: { label: "No tasks yet", tone: "muted" },
 };
 
+/** Score thresholds: crushing ≥ 90, on track ≥ 75, slipping ≥ 50, lagging below. */
+export function levelForScore(score: number): Level {
+  return score >= 90 ? "crushing" : score >= 75 ? "on_track" : score >= 50 ? "slipping" : "lagging";
+}
+
 export interface WeekBucket {
   weekStart: string;
   label: string;
@@ -185,7 +190,7 @@ export function computeUserStats(userId: string, allTasks: TaskDTO[], now = new 
         : ongoing > 0 ? 0 : 0.8;
     score = Math.round(100 * (0.4 * reliability + 0.45 * overdueFactor + 0.15 * activityFactor));
     score = Math.max(0, Math.min(100, score));
-    level = score >= 90 ? "crushing" : score >= 75 ? "on_track" : score >= 50 ? "slipping" : "lagging";
+    level = levelForScore(score);
     const idle = ongoing > 0 && (daysSinceActivity === null || daysSinceActivity >= 7);
     if (idle && level !== "lagging") {
       level = "idle";

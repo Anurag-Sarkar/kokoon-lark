@@ -3,12 +3,24 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { CheckCircle2, ChevronLeft, ChevronRight, LayoutList, Search, SquareKanban, X } from "lucide-react";
-import { PRIORITIES, PRIORITY_LABEL, STATUSES, STATUS_LABEL, type UserDTO } from "@/lib/types";
+import { PRIORITIES, PRIORITY_LABEL, STATUSES, STATUS_LABEL, type TeamDTO, type UserDTO } from "@/lib/types";
 import type { Period } from "@/lib/period";
 
-const KEEP_ON_CLEAR = ["view", "scope", "done", "range", "at"];
+const KEEP_ON_CLEAR = ["view", "scope", "team", "done", "range", "at"];
 
-export function TaskFilters({ users, isAdmin, period, showDone }: { users: UserDTO[]; isAdmin: boolean; period: Period; showDone: boolean }) {
+export type Scope = "mine" | "team" | "all";
+
+export function TaskFilters({ users, teams, isAdmin, scope, teamId, period, showDone }: {
+  users: UserDTO[];
+  /** Teams this person may pick from: every team for admins, their own teams for members */
+  teams: TeamDTO[];
+  isAdmin: boolean;
+  scope: Scope;
+  /** Selected team id, or "" for all of the person's teams */
+  teamId: string;
+  period: Period;
+  showDone: boolean;
+}) {
   const router = useRouter();
   const path = usePathname();
   const sp = useSearchParams();
@@ -30,9 +42,14 @@ export function TaskFilters({ users, isAdmin, period, showDone }: { users: UserD
   }, [q]);
 
   const view = sp.get("view") ?? "list";
-  const scope = sp.get("scope") ?? (isAdmin ? "all" : "mine");
   const status = sp.get("status") ?? "";
   const active = ["status", "priority", "assignee", "q"].filter((k) => sp.get(k)).length;
+
+  const scopes: [Scope, string][] = isAdmin
+    ? [["mine", "My tasks"], ["team", "Team"], ["all", "Everyone"]]
+    : [["mine", "My tasks"], ["team", "My team"]];
+  const memberIds = new Set((teamId ? teams.filter((t) => t.id === teamId) : teams).flatMap((t) => t.members));
+  const ownerOptions = scope === "team" ? users.filter((u) => memberIds.has(u.id)) : users;
 
   const toggleDone = () => {
     if (showDone) setMany({ done: "", range: "", at: "", status: status === "done" ? "" : status });
@@ -54,10 +71,16 @@ export function TaskFilters({ users, isAdmin, period, showDone }: { users: UserD
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search tasks" className="input pl-8 h-9 w-52" aria-label="Search tasks" />
       </div>
       <div className="inline-flex rounded-[10px] border border-line-2 bg-surface p-0.5">
-        {([["mine", "My tasks"], ["all", "Everyone"]] as const).map(([v, l]) => (
-          <button key={v} type="button" onClick={() => set("scope", v)} className={seg(scope === v)}>{l}</button>
+        {scopes.map(([v, l]) => (
+          <button key={v} type="button" onClick={() => setMany({ scope: v, team: "", assignee: "" })} className={seg(scope === v)}>{l}</button>
         ))}
       </div>
+      {scope === "team" && teams.length > (isAdmin ? 0 : 1) && (
+        <select value={teamId} onChange={(e) => setMany({ team: e.target.value, assignee: "" })} className="select h-9 w-auto py-0 text-xs font-semibold" aria-label="Team">
+          {!isAdmin && <option value="">All my teams</option>}
+          {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+        </select>
+      )}
       <select value={status} onChange={(e) => set("status", e.target.value)} className="select h-9 w-auto py-0 text-xs font-semibold" aria-label="Status">
         <option value="">Any status</option>
         <option value="open">Open</option>
@@ -67,10 +90,10 @@ export function TaskFilters({ users, isAdmin, period, showDone }: { users: UserD
         <option value="">Any priority</option>
         {PRIORITIES.map((p) => <option key={p} value={p}>{PRIORITY_LABEL[p]}</option>)}
       </select>
-      {scope === "all" && (
+      {scope !== "mine" && ownerOptions.length > 0 && (
         <select value={sp.get("assignee") ?? ""} onChange={(e) => set("assignee", e.target.value)} className="select h-9 w-auto py-0 text-xs font-semibold" aria-label="Owner">
           <option value="">Any owner</option>
-          {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+          {ownerOptions.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
         </select>
       )}
 

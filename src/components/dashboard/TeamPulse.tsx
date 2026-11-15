@@ -6,11 +6,11 @@ import { ScoreRing } from "@/components/ui/ScoreRing";
 import { LevelPill } from "@/components/ui/Pills";
 import { SectionTitle } from "@/components/shell/PageHeader";
 
-export function TeamPulse({ people, currentUserId, linkToAdmin }: { people: { user: UserDTO; stats: UserStats }[]; currentUserId: string; linkToAdmin: boolean }) {
+export function TeamPulse({ people, currentUserId, linkToAdmin, hint = "Everyone sees the same picture. Ownership is visible." }: { people: { user: UserDTO; stats: UserStats }[]; currentUserId: string; linkToAdmin: boolean; hint?: string }) {
   const sorted = [...people].sort((a, b) => (b.stats.score ?? -1) - (a.stats.score ?? -1));
   return (
     <section>
-      <SectionTitle hint="Everyone sees the same picture. Ownership is visible.">Team pulse</SectionTitle>
+      <SectionTitle hint={hint}>Team pulse</SectionTitle>
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
         {sorted.map(({ user, stats }, i) => {
           const isSelf = user.id === currentUserId;

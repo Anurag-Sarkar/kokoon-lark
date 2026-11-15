@@ -1,5 +1,5 @@
-import type { TaskDoc, UserDoc } from "./models";
-import type { TaskDTO, UserDTO } from "./types";
+import type { TaskDoc, TeamDoc, UserDoc } from "./models";
+import type { TaskDTO, TeamDTO, UserDTO } from "./types";
 
 const iso = (d: Date | null | undefined): string | null => (d ? new Date(d).toISOString() : null);
 const isoReq = (d: Date): string => new Date(d).toISOString();
@@ -14,6 +14,17 @@ export function toUserDTO(u: UserDoc): UserDTO {
     color: u.color ?? "#2a78d6",
     active: u.active !== false,
     createdAt: isoReq(u.createdAt),
+  };
+}
+
+export function toTeamDTO(t: TeamDoc): TeamDTO {
+  return {
+    id: t._id.toString(),
+    name: t.name,
+    description: t.description ?? "",
+    color: t.color ?? "#2a78d6",
+    members: (t.members ?? []).map((m) => m.toString()),
+    createdAt: isoReq(t.createdAt),
   };
 }
 

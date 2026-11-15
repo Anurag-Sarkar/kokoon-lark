@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { CalendarClock, LayoutDashboard, ListTodo, LogOut, Plus, SquareKanban, UserCog, Users } from "lucide-react";
+import { CalendarClock, LayoutDashboard, ListTodo, LogOut, Plus, SquareKanban, UserCog, Users, UsersRound } from "lucide-react";
 import { logout } from "@/lib/actions";
 import type { UserDTO } from "@/lib/types";
 import { Avatar } from "@/components/ui/Avatar";
@@ -20,6 +20,7 @@ export function Sidebar({ user }: { user: UserDTO }) {
   ];
   const admin: Item[] = [
     { href: "/admin", label: "Team overview", icon: Users, match: (p) => p === "/admin" || p.startsWith("/admin/people/") },
+    { href: "/admin/teams", label: "Teams", icon: UsersRound, match: (p) => p.startsWith("/admin/teams") },
     { href: "/admin/people", label: "People", icon: UserCog, match: (p) => p === "/admin/people" },
     { href: "/admin/deadline-changes", label: "Deadline log", icon: CalendarClock, match: (p) => p === "/admin/deadline-changes" },
   ];

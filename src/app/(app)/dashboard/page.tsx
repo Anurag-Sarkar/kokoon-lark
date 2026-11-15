@@ -2,7 +2,8 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { Plus } from "lucide-react";
 import { requireUser } from "@/lib/auth";
-import { listAllTasks, listUsers, userMap } from "@/lib/queries";
+import { listAllTasks, listTeams, listUsers, userMap } from "@/lib/queries";
+import { peerIds, teamsOf } from "@/lib/teams";
 import { computeUserStats } from "@/lib/stats";
 import { PageHeader, SectionTitle } from "@/components/shell/PageHeader";
 import { PulseCard } from "@/components/dashboard/PulseCard";
@@ -15,11 +16,19 @@ import { TaskGroups } from "@/components/tasks/TaskGroups";
 export default async function DashboardPage() {
   const user = await requireUser();
   const now = new Date();
-  const [users, tasks] = await Promise.all([listUsers(), listAllTasks()]);
+  const [users, tasks, teams] = await Promise.all([listUsers(), listAllTasks(), listTeams()]);
   const umap = userMap(users);
   const stats = computeUserStats(user.id, tasks, now);
   const mine = tasks.filter((t) => t.assignees.includes(user.id));
-  const people = users.map((u) => ({ user: u, stats: u.id === user.id ? stats : computeUserStats(u.id, tasks, now) }));
+
+  // Members compare themselves with their team; admins see everyone.
+  const myTeams = teamsOf(user.id, teams);
+  const peers = user.role === "admin" || myTeams.length === 0 ? null : peerIds(user.id, teams);
+  const pulseUsers = peers ? users.filter((u) => peers.has(u.id)) : users;
+  const pulseHint = peers
+    ? `${myTeams.map((t) => t.name).join(" · ")} · everyone in your team sees the same picture.`
+    : user.role === "admin" ? "Everyone, ranked by ownership score. Click a person to drill in." : "You're not in a team yet, so this is everyone.";
+  const people = pulseUsers.map((u) => ({ user: u, stats: u.id === user.id ? stats : computeUserStats(u.id, tasks, now) }));
   const hour = now.getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
@@ -51,7 +60,7 @@ export default async function DashboardPage() {
         <TaskGroups tasks={mine} users={umap} now={now} />
       </section>
 
-      <TeamPulse people={people} currentUserId={user.id} linkToAdmin={user.role === "admin"} />
+      <TeamPulse people={people} currentUserId={user.id} linkToAdmin={user.role === "admin"} hint={pulseHint} />
     </div>
   );
 }
