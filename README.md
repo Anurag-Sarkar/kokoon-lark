@@ -48,6 +48,7 @@ Production: `npm run build && npm start`. Set `MONGODB_URI` (and the email varia
 **Dependencies**
 - A task can depend on work from other people. From the task page, *Add dependency* creates a real task for them with its own deadline (on or before the parent's), linked back to the task it feeds. It shows up in their list, board and dashboard like any task and counts in their ownership score the same way, so a late dependency costs its owner, not the person waiting on it.
 - The parent shows its dependencies with status and health, and a "still open" warning next to Mark done. Deleting a parent leaves its dependencies as ordinary tasks.
+- Deadlines stay consistent: a dependency can't be moved past the task it feeds, and a task can't be pulled in before an open dependency. Both are checked when a change is made or requested, and again when a request is approved.
 
 **Integrity flags**
 - If someone marks a task done without the work being done, an admin or the owner's team owner can *Flag as not actually done* with a reason. The task is reopened, the owners are notified, and each active flag in the last 30 days takes 15 points off their ownership score (shown in the people table and on their page). Reviewers can clear a flag with a note once the work is real; a task's owners can never flag or clear their own.

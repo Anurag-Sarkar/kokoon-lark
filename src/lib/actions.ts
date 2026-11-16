@@ -205,6 +205,27 @@ export async function setTaskStatus(taskId: string, status: Status): Promise<Act
   return { ok: true };
 }
 
+/**
+ * A dependency can't be due after the task it feeds, and a task can't be due before its open dependencies.
+ * Returns a message explaining the conflict, or null when the new deadline is fine.
+ */
+async function deadlineConflict(task: Pick<TaskDoc, "_id" | "parentId">, newDeadline: Date): Promise<string | null> {
+  if (task.parentId) {
+    const parent = await Task.findById(task.parentId).select("title deadline").lean();
+    if (parent && newDeadline.getTime() > new Date(parent.deadline).getTime()) {
+      return `This is a dependency of "${parent.title}", which is due ${fmtShortDateTime(new Date(parent.deadline).toISOString())}. Pick a time on or before that, or move that task's deadline first.`;
+    }
+  }
+  const blocking = await Task.find({ parentId: task._id, status: { $ne: "done" }, deadline: { $gt: newDeadline } }).select("title deadline").sort({ deadline: -1 }).lean();
+  if (blocking.length > 0) {
+    const list = blocking.map((b) => `"${b.title}" (${fmtShortDateTime(new Date(b.deadline).toISOString())})`).join(", ");
+    return blocking.length === 1
+      ? `An open dependency is due after that: ${list}. Move it earlier first.`
+      : `${blocking.length} open dependencies are due after that: ${list}. Move them earlier first.`;
+  }
+  return null;
+}
+
 export type DeadlineResult = { ok: true; applied: boolean; reviewers: string[] } | { ok: false; error: string };
 
 /**
@@ -220,6 +241,8 @@ export async function changeDeadline(taskId: string, newDeadlineRaw: string, rea
   const trimmed = reason.trim();
   if (trimmed.length < 5) return { ok: false, error: "Give a real reason (at least 5 characters). It will be visible to the team." };
   if (newDeadline.getTime() === new Date(task.deadline).getTime()) return { ok: false, error: "That's already the deadline." };
+  const conflict = await deadlineConflict(task, newDeadline);
+  if (conflict) return { ok: false, error: conflict };
   const oldIso = new Date(task.deadline).toISOString();
   const newIso = newDeadline.toISOString();
   const shift = `${shiftLabel(oldIso, newIso)}: ${fmtShortDateTime(oldIso)} → ${fmtShortDateTime(newIso)}`;
@@ -286,6 +309,8 @@ export async function reviewDeadlineRequest(taskId: string, requestId: string, d
   };
   const noteText = cleanNote ? ` Note: ${cleanNote}` : "";
   if (approve) {
+    const conflict = await deadlineConflict(task, new Date(req.newDeadline)); // things may have moved since it was asked
+    if (conflict) return fail(`Can't approve this as it stands. ${conflict}`);
     await Task.updateOne(
       { _id: task._id, "deadlineRequests._id": req._id },
       {

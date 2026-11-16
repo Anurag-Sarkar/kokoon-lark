@@ -44,6 +44,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   const flagger = flag ? umap.get(flag.by) ?? null : null;
   const mayFlag = canFlag(user, task, teams);
   const openChildren = children.filter((c) => c.status !== "done").length;
+  const latestOpenChild = children.filter((c) => c.status !== "done").map((c) => c.deadline).sort().at(-1);
 
   return (
     <div className="grid grid-cols-1 gap-5">
@@ -171,7 +172,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
                 <ReviewButtons taskId={task.id} requestId={pending.id} canReview={canDecide} canWithdraw={canWithdraw} />
               </div>
             ) : (
-              <DeadlineChanger task={task} canEdit={canEdit} direct={direct} reviewerLabel={myReviewers} />
+              <DeadlineChanger task={task} canEdit={canEdit} direct={direct} reviewerLabel={myReviewers} minDeadline={latestOpenChild} maxDeadline={parent?.deadline} />
             )}
             {moved && (
               <ol className="grid gap-2 border-t border-line pt-3">

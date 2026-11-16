@@ -46,7 +46,7 @@ export function StatusControl({ task, canEdit }: { task: TaskDTO; canEdit: boole
  * Admins (`direct`) move the deadline on the spot. Everyone else sends a request to `reviewerLabel`,
  * and the current deadline keeps counting until it's approved.
  */
-export function DeadlineChanger({ task, canEdit, direct, reviewerLabel }: { task: TaskDTO; canEdit: boolean; direct: boolean; reviewerLabel: string }) {
+export function DeadlineChanger({ task, canEdit, direct, reviewerLabel, minDeadline, maxDeadline }: { task: TaskDTO; canEdit: boolean; direct: boolean; reviewerLabel: string; /** latest open dependency, so the task can't be pulled in before it */ minDeadline?: string; /** the parent task's deadline, for a dependency */ maxDeadline?: string }) {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(toDatetimeLocal(task.deadline));
   const [reason, setReason] = useState("");
@@ -66,7 +66,9 @@ export function DeadlineChanger({ task, canEdit, direct, reviewerLabel }: { task
           </p>
           <div>
             <label className="label" htmlFor="newDeadline">New deadline</label>
-            <input id="newDeadline" type="datetime-local" value={value} onChange={(e) => setValue(e.target.value)} className="input" />
+            <input id="newDeadline" type="datetime-local" value={value} min={minDeadline ? toDatetimeLocal(minDeadline) : undefined} max={maxDeadline ? toDatetimeLocal(maxDeadline) : undefined} onChange={(e) => setValue(e.target.value)} className="input" />
+            {maxDeadline && <p className="mt-1 text-[11px] text-ink-3">No later than the task it feeds: {toDatetimeLocal(maxDeadline).replace("T", " ")}.</p>}
+            {minDeadline && <p className="mt-1 text-[11px] text-ink-3">No earlier than its latest open dependency: {toDatetimeLocal(minDeadline).replace("T", " ")}.</p>}
           </div>
           <div>
             <label className="label" htmlFor="reason">Reason <span className="text-critical-text">*</span></label>
