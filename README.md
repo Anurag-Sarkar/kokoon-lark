@@ -135,6 +135,8 @@ Repository settings the workflow needs (Settings → Secrets and variables → A
 
 The security group must allow inbound 22 (for the workflow) and 80/443 (for users).
 
+**HTTPS:** with a DNS name pointing at the instance, `sudo dnf install -y certbot python3-certbot-nginx && sudo certbot --nginx -d <host> --redirect` issues a Let's Encrypt certificate, rewrites the nginx config and enables `certbot-renew.timer`. Then set `APP_URL=https://<host>` and `pm2 restart kokoon --update-env`. The session cookie is `secure` in production, so sign-in only works over HTTPS (or on localhost).
+
 ## Project layout
 
 ```
