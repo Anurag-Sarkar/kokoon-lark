@@ -37,6 +37,16 @@ export interface SessionDoc {
   createdAt: Date;
 }
 
+export interface PushSubscriptionDoc {
+  _id: Types.ObjectId;
+  userId: Types.ObjectId;
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+  userAgent: string;
+  createdAt: Date;
+  lastUsedAt: Date | null;
+}
+
 export interface TeamDoc {
   _id: Types.ObjectId;
   name: string;
@@ -157,6 +167,18 @@ const SessionSchema = new Schema<SessionDoc>(
 );
 SessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
+const PushSubscriptionSchema = new Schema<PushSubscriptionDoc>(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    endpoint: { type: String, required: true, unique: true },
+    keys: { p256dh: { type: String, required: true }, auth: { type: String, required: true } },
+    userAgent: { type: String, default: "" },
+    lastUsedAt: { type: Date, default: null },
+  },
+  { timestamps: { createdAt: true, updatedAt: false } }
+);
+PushSubscriptionSchema.index({ userId: 1 });
+
 const TeamSchema = new Schema<TeamDoc>(
   {
     name: { type: String, required: true, trim: true },
@@ -260,6 +282,10 @@ export const Task: Model<TaskDoc> =
 
 export const Team: Model<TeamDoc> =
   (mongoose.models.Team as Model<TeamDoc>) ?? mongoose.model<TeamDoc>("Team", TeamSchema);
+
+export const PushSubscription: Model<PushSubscriptionDoc> =
+  (mongoose.models.PushSubscription as Model<PushSubscriptionDoc>) ??
+  mongoose.model<PushSubscriptionDoc>("PushSubscription", PushSubscriptionSchema);
 
 export const AuthToken: Model<AuthTokenDoc> =
   (mongoose.models.AuthToken as Model<AuthTokenDoc>) ?? mongoose.model<AuthTokenDoc>("AuthToken", AuthTokenSchema);

@@ -126,3 +126,8 @@ body {
 
 .kanban-col { min-height: 240px; }
 .kanban-col[data-over="true"] { background: var(--color-accent-soft); }
+
+/* iOS Safari zooms into any form control smaller than 16px when it gets focus. Keep controls at 16px on phones. */
+@media (max-width: 767px) {
+  .input, .select, .textarea { font-size: 1rem; }
+}

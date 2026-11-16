@@ -22,10 +22,10 @@ export function StatusControl({ task, canEdit }: { task: TaskDTO; canEdit: boole
   const isDone = task.status === "done";
   return (
     <div className="grid gap-2">
-      <div className="inline-flex w-full rounded-[10px] border border-line-2 bg-surface p-0.5">
+      <div className="grid grid-cols-2 gap-1 rounded-xl border border-line-2 bg-surface p-1">
         {STATUSES.map((s) => (
           <button key={s} type="button" disabled={!canEdit || pending} onClick={() => run(() => setTaskStatus(task.id, s))}
-            className={`flex-1 h-8 rounded-lg text-xs font-semibold transition ${task.status === s ? (s === "done" ? "bg-good text-white" : "bg-ink text-white") : "text-ink-2 hover:bg-surface-2 disabled:hover:bg-transparent"}`}>
+            className={`h-9 px-3 rounded-lg text-xs font-semibold whitespace-nowrap transition ${task.status === s ? (s === "done" ? "bg-good text-white" : "bg-ink text-white") : "text-ink-2 hover:bg-surface-2 disabled:hover:bg-transparent"}`}>
             {STATUS_LABEL[s]}
           </button>
         ))}

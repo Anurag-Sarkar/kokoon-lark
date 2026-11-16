@@ -17,6 +17,8 @@ export const viewport: Viewport = {
   themeColor: "#ffffff",
   width: "device-width",
   initialScale: 1,
+  // Stops iOS Safari's automatic zoom when a field is focused. Pinch-zoom still works: Safari ignores this for user gestures.
+  maximumScale: 1,
   viewportFit: "cover",
 };
 
