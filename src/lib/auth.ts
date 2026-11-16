@@ -26,9 +26,11 @@ export const getCurrentUser = cache(async (): Promise<UserDTO | null> => {
   }
 });
 
-export async function requireUser(): Promise<UserDTO> {
+/** Signed-in user, or a redirect to /login. Someone on a temporary password is sent to /account until they change it. */
+export async function requireUser(opts: { allowPasswordChange?: boolean } = {}): Promise<UserDTO> {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  if (user.mustChangePassword && !opts.allowPasswordChange) redirect("/account?change=required");
   return user;
 }
 
@@ -46,7 +48,26 @@ export async function createSession(userId: string): Promise<{ token: string; ex
   return { token, expiresAt };
 }
 
+/** Creates a session and sets the cookie. Call from a server action, then redirect. */
+export async function startSession(userId: string): Promise<void> {
+  const { token, expiresAt } = await createSession(userId);
+  const jar = await cookies();
+  jar.set(SESSION_COOKIE, token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    expires: expiresAt,
+    path: "/",
+  });
+}
+
 export async function destroySession(token: string): Promise<void> {
   await connectDB();
   await Session.deleteOne({ token });
+}
+
+/** Signs a person out everywhere, e.g. after a password reset. */
+export async function destroyAllSessions(userId: string): Promise<void> {
+  await connectDB();
+  await Session.deleteMany({ userId });
 }

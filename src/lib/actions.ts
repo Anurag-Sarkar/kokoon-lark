@@ -5,7 +5,11 @@ import { Types } from "mongoose";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { SESSION_COOKIE, createSession, destroySession, getCurrentUser } from "./auth";
+import { SESSION_COOKIE, destroySession, getCurrentUser, startSession } from "./auth";
+import { INVITE_TTL_MS, issueToken } from "./tokens";
+import { appUrl, mailConfigured, sendMail } from "./mail";
+import { inviteEmail, tempPasswordEmail } from "./emails";
+import { notifyAssigned } from "./notify";
 import { connectDB } from "./mongodb";
 import { Task, Team, User, type TaskDoc } from "./models";
 import { isValidId } from "./queries";
@@ -68,7 +72,7 @@ function parseTags(raw: string | null | undefined): string[] {
 
 /* ---------------- auth ---------------- */
 
-export type FormState = { error?: string } | undefined;
+export type FormState = { error?: string; message?: string; link?: string; delivered?: boolean } | undefined;
 
 export async function login(_prev: FormState, formData: FormData): Promise<FormState> {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
@@ -76,28 +80,22 @@ export async function login(_prev: FormState, formData: FormData): Promise<FormS
   if (!email || !password) return { error: "Enter your email and password." };
 
   let userId: string | null = null;
+  let mustChange = false;
   try {
     await connectDB();
     const user = await User.findOne({ email }).lean();
-    if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
-      return { error: "That email and password don't match." };
-    }
+    if (!user) return { error: "That email and password don't match." };
+    if (!user.passwordHash) return { error: "This account hasn't been set up yet. Use the invite link from your email, or ask your admin to resend it." };
+    if (!(await bcrypt.compare(password, user.passwordHash))) return { error: "That email and password don't match." };
     if (user.active === false) return { error: "This account has been deactivated. Ask your admin." };
     userId = user._id.toString();
+    mustChange = !!user.mustChangePassword;
   } catch {
     return { error: "Could not reach the database. Is MongoDB running?" };
   }
 
-  const { token, expiresAt } = await createSession(userId);
-  const jar = await cookies();
-  jar.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    expires: expiresAt,
-    path: "/",
-  });
-  redirect("/dashboard");
+  await startSession(userId);
+  redirect(mustChange ? "/account?change=required" : "/dashboard");
 }
 
 export async function logout(): Promise<void> {
@@ -147,6 +145,7 @@ export async function createTask(_prev: FormState, formData: FormData): Promise<
     ],
   });
 
+  await notifyAssigned(created, assignees, user, names);
   revalidateAll();
   redirect(`/tasks/${created._id.toString()}`);
 }
@@ -244,6 +243,8 @@ export async function setAssignees(taskId: string, userIds: string[]): Promise<A
       $push: { activity: activity(user.id, "assignees", `Owners are now ${users.map((u) => u.name).join(", ")}.`) },
     }
   );
+  const added = ids.filter((id) => !task.assignees.some((a) => a.toString() === id));
+  await notifyAssigned(task, added, user, users.map((u) => u.name));
   revalidateAll();
   return { ok: true };
 }
@@ -335,23 +336,40 @@ export async function createUser(_prev: FormState, formData: FormData): Promise<
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const title = String(formData.get("title") ?? "").trim();
   const role = (String(formData.get("role") ?? "member") as Role) === "admin" ? "admin" : "member";
+  const onboarding = String(formData.get("onboarding") ?? "invite") === "temp" ? "temp" : "invite";
   const password = String(formData.get("password") ?? "");
+  const teamIds = formData.getAll("teams").map(String).filter(isValidId);
   if (name.length < 2) return { error: "Enter the person's name." };
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { error: "Enter a valid email." };
-  if (password.length < 6) return { error: "Password needs at least 6 characters." };
+  if (onboarding === "temp" && password.length < 6) return { error: "Temporary password needs at least 6 characters." };
 
   await connectDB();
   if (await User.exists({ email })) return { error: "Someone with that email already exists." };
   const count = await User.countDocuments();
   const created = await User.create({
     name, email, title, role,
-    passwordHash: await bcrypt.hash(password, 10),
+    passwordHash: onboarding === "temp" ? await bcrypt.hash(password, 10) : "",
+    mustChangePassword: onboarding === "temp",
     color: AVATAR_COLORS[count % AVATAR_COLORS.length],
   });
-  const teamIds = formData.getAll("teams").map(String).filter(isValidId);
   if (teamIds.length > 0) await Team.updateMany({ _id: { $in: teamIds } }, { $addToSet: { members: created._id } });
+  const base = await appUrl();
+
+  if (onboarding === "invite") {
+    const raw = await issueToken(created._id.toString(), "invite", INVITE_TTL_MS);
+    const link = `${base}/invite/${raw}`;
+    const r = await sendMail({ to: email, ...inviteEmail({ name, inviterName: actor.name, link, days: 7 }) });
+    revalidateAll();
+    if (!r.ok) return { message: `${name} was added, but the invite email failed (${r.error}). Share this link with them instead; it works for 7 days.`, link, delivered: false };
+    if (!r.delivered) return { message: `${name} was added. Email isn't set up yet, so share this invite link with them yourself; it works for 7 days.`, link, delivered: false };
+    return { message: `Invite sent to ${email}. The link works for 7 days.`, link, delivered: true };
+  }
+
+  const r = await sendMail({ to: email, ...tempPasswordEmail({ name, email, tempPassword: password, loginUrl: `${base}/login`, byName: actor.name, reason: "created" }) });
   revalidateAll();
-  return {};
+  if (!r.ok) return { message: `${name} was added, but the email failed (${r.error}). Share the temporary password with them yourself; they'll be asked to change it on first sign-in.`, delivered: false };
+  if (!r.delivered) return { message: `${name} was added. Email isn't set up yet, so share the temporary password with them yourself; they'll be asked to change it on first sign-in.`, delivered: false };
+  return { message: `Account created. The temporary password was emailed to ${email}; they'll be asked to change it on first sign-in.`, delivered: true };
 }
 
 export async function setUserRole(userId: string, role: Role): Promise<ActionResult> {
@@ -376,14 +394,24 @@ export async function setUserActive(userId: string, active: boolean): Promise<Ac
   return { ok: true };
 }
 
-export async function resetPassword(userId: string, password: string): Promise<ActionResult> {
+export type ResetResult = { ok: true; delivered: boolean; configured: boolean } | { ok: false; error: string };
+
+/** Admin sets a temporary password for someone; they must change it on their next sign-in. */
+export async function resetPassword(userId: string, password: string, notify = true): Promise<ResetResult> {
   const actor = await requireActor();
-  if (actor.role !== "admin" && actor.id !== userId) return fail("Not allowed.");
-  if (password.length < 6) return fail("Password needs at least 6 characters.");
-  if (!isValidId(userId)) return fail("User not found.");
+  if (actor.role !== "admin") return { ok: false, error: "Admins only." };
+  if (password.length < 6) return { ok: false, error: "Password needs at least 6 characters." };
+  if (!isValidId(userId)) return { ok: false, error: "User not found." };
   await connectDB();
-  await User.updateOne({ _id: userId }, { $set: { passwordHash: await bcrypt.hash(password, 10) } });
-  return { ok: true };
+  const user = await User.findById(userId).lean();
+  if (!user) return { ok: false, error: "User not found." };
+  const self = actor.id === userId;
+  await User.updateOne({ _id: userId }, { $set: { passwordHash: await bcrypt.hash(password, 10), mustChangePassword: !self } });
+  revalidateAll();
+  if (self || !notify) return { ok: true, delivered: false, configured: mailConfigured() };
+  const r = await sendMail({ to: user.email, ...tempPasswordEmail({ name: user.name, email: user.email, tempPassword: password, loginUrl: `${await appUrl()}/login`, byName: actor.name, reason: "reset" }) });
+  if (!r.ok) return { ok: false, error: `Password was changed, but the email failed: ${r.error}` };
+  return { ok: true, delivered: r.delivered, configured: mailConfigured() };
 }
 
 /* ---------------- teams ---------------- */

@@ -27,6 +27,11 @@ export interface UserDTO {
   title: string;
   color: string;
   active: boolean;
+  /** false for an invited person who hasn't set a password yet */
+  hasPassword: boolean;
+  /** true after a temporary password: the next sign-in must change it */
+  mustChangePassword: boolean;
+  emailNotifications: boolean;
   createdAt: string;
 }
 

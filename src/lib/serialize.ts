@@ -13,6 +13,9 @@ export function toUserDTO(u: UserDoc): UserDTO {
     title: u.title ?? "",
     color: u.color ?? "#2a78d6",
     active: u.active !== false,
+    hasPassword: !!u.passwordHash,
+    mustChangePassword: !!u.mustChangePassword,
+    emailNotifications: u.emailNotifications !== false,
     createdAt: isoReq(u.createdAt),
   };
 }

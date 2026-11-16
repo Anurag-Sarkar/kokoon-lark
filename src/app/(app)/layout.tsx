@@ -2,7 +2,8 @@ import { requireUser } from "@/lib/auth";
 import { Sidebar } from "@/components/shell/Sidebar";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const user = await requireUser();
+  // Pages enforce the forced password change themselves, so /account can render inside the shell.
+  const user = await requireUser({ allowPasswordChange: true });
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[236px_minmax(0,1fr)]">
       <Sidebar user={user} />

@@ -58,11 +58,13 @@ export function Sidebar({ user }: { user: UserDTO }) {
       </div>
 
       <div className="hidden lg:flex mt-auto items-center gap-3 border-t border-line px-4 py-4">
-        <Avatar user={user} size="md" />
-        <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold truncate">{user.name}</div>
-          <div className="text-xs text-ink-3 truncate">{user.role === "admin" ? "Admin" : user.title || "Member"}</div>
-        </div>
+        <Link href="/account" className="flex items-center gap-3 min-w-0 flex-1 rounded-lg -m-1 p-1 hover:bg-surface-2 transition" title="Account settings">
+          <Avatar user={user} size="md" />
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-semibold truncate">{user.name}</div>
+            <div className="text-xs text-ink-3 truncate">{user.role === "admin" ? "Admin" : user.title || "Member"}</div>
+          </div>
+        </Link>
         <form action={logout}>
           <button type="submit" className="btn btn-ghost btn-sm px-2" title="Sign out" aria-label="Sign out"><LogOut className="size-4" /></button>
         </form>

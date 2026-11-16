@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { login, type FormState } from "@/lib/actions";
 
@@ -12,7 +13,10 @@ export function LoginForm() {
         <input id="email" name="email" type="email" autoComplete="email" required className="input" placeholder="you@kokoon.ai" />
       </div>
       <div>
-        <label className="label" htmlFor="password">Password</label>
+        <div className="flex items-center justify-between">
+          <label className="label" htmlFor="password">Password</label>
+          <Link href="/forgot-password" className="text-xs text-accent-deep hover:underline mb-1.5">Forgot password?</Link>
+        </div>
         <input id="password" name="password" type="password" autoComplete="current-password" required className="input" placeholder="••••••••" />
       </div>
       {state?.error && (

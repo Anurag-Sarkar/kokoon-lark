@@ -7,13 +7,26 @@ export interface UserDoc {
   _id: Types.ObjectId;
   name: string;
   email: string;
+  /** empty string until an invited person sets a password */
   passwordHash: string;
   role: Role;
   title: string;
   color: string;
   active: boolean;
+  mustChangePassword: boolean;
+  emailNotifications: boolean;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface AuthTokenDoc {
+  _id: Types.ObjectId;
+  tokenHash: string;
+  userId: Types.ObjectId;
+  purpose: "invite" | "reset";
+  expiresAt: Date;
+  usedAt: Date | null;
+  createdAt: Date;
 }
 
 export interface SessionDoc {
@@ -94,14 +107,28 @@ const UserSchema = new Schema<UserDoc>(
   {
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-    passwordHash: { type: String, required: true },
+    passwordHash: { type: String, default: "" },
     role: { type: String, enum: ["admin", "member"], default: "member" },
     title: { type: String, default: "" },
     color: { type: String, default: "#2a78d6" },
     active: { type: Boolean, default: true },
+    mustChangePassword: { type: Boolean, default: false },
+    emailNotifications: { type: Boolean, default: true },
   },
   { timestamps: true }
 );
+
+const AuthTokenSchema = new Schema<AuthTokenDoc>(
+  {
+    tokenHash: { type: String, required: true, unique: true },
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    purpose: { type: String, enum: ["invite", "reset"], required: true },
+    expiresAt: { type: Date, required: true },
+    usedAt: { type: Date, default: null },
+  },
+  { timestamps: { createdAt: true, updatedAt: false } }
+);
+AuthTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 24 * 3600 });
 
 const SessionSchema = new Schema<SessionDoc>(
   {
@@ -199,3 +226,6 @@ export const Task: Model<TaskDoc> =
 
 export const Team: Model<TeamDoc> =
   (mongoose.models.Team as Model<TeamDoc>) ?? mongoose.model<TeamDoc>("Team", TeamSchema);
+
+export const AuthToken: Model<AuthTokenDoc> =
+  (mongoose.models.AuthToken as Model<AuthTokenDoc>) ?? mongoose.model<AuthTokenDoc>("AuthToken", AuthTokenSchema);

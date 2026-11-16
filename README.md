@@ -23,7 +23,7 @@ Demo logins after seeding:
 | Member | priya@kokoon.ai    | password123   |
 | Member | rohan@ / sara@ / dev@ / meera@kokoon.ai | password123 |
 
-To start from a clean database instead of demo data, skip `npm run seed` and insert one admin user manually, or run the seed once and delete the demo people from **People**.
+To start from a clean database instead of demo data, skip `npm run seed`: with no accounts in the database the login page offers **Set up workspace**, which creates the first admin at `/signup`. After that, everyone else joins by invite.
 
 Production: `npm run build && npm start`. Set `MONGODB_URI` in the environment.
 
@@ -54,12 +54,46 @@ Production: `npm run build && npm start`. Set `MONGODB_URI` in the environment.
 - "Needs your attention" list, weekly completions chart (on time vs late), and the full task list.
 - Team pulse: your teammates' scores and status side by side (everyone, for admins).
 
+**Accounts and email**
+- First admin signs up at `/signup` (only works while the database has no accounts).
+- Admins add people from **People** in one of two ways: **email an invite** (a one-time link, valid 7 days, where they choose a password) or **set a temporary password** (emailed to them; they must change it on first sign-in before they can use the app).
+- **Resend invite** for anyone who hasn't set a password yet; the link is also shown on screen to copy.
+- **Forgot password** on the login page emails a one-time reset link valid for 60 minutes. Admins can also set a new temporary password from People.
+- Everyone gets an email when a task is assigned to them (not for tasks they assign to themselves). It can be turned off under **Account**, reached by clicking your name in the sidebar, which is also where you change your password.
+
 **Admin** (team overview)
 - Team totals, team-by-team cards, sortable people table with every stat, workload chart, team completion trend.
 - Per-team drill-down: team score and verdict, tiles, members ranked by score, charts, overdue list, and member management.
 - Per-person drill-down with their dashboard, their deadline changes, and their tasks.
 - Deadline log across the whole team with reasons and per-person counts.
 - People management: add, set role, deactivate, reset password.
+
+## Email setup
+
+Nothing is required to run the app. Without an email provider, every email is printed to the server console and invite links appear in the admin UI, so you can still onboard people by sharing links yourself. To actually deliver email, set **one** of these in `.env.local` (or in Vercel's environment variables):
+
+**Option A: Resend** (recommended; free for 3,000 emails/month)
+1. Create an account at https://resend.com.
+2. Add and verify your domain under *Domains* (add the DNS records they show). Until then, Resend only delivers to the address you signed up with, from `onboarding@resend.dev`, which is enough for testing.
+3. Create an API key under *API Keys* and set:
+   ```
+   RESEND_API_KEY=re_xxxxxxxx
+   MAIL_FROM="Kokoon Task <tasks@yourdomain.com>"
+   ```
+
+**Option B: SMTP** (any provider; Gmail works for small teams)
+1. In your Google account turn on 2-step verification, then create an *App password* (Security → App passwords) for "Mail".
+2. Set:
+   ```
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=465
+   SMTP_USER=you@gmail.com
+   SMTP_PASS=the 16-character app password
+   MAIL_FROM="Kokoon Task <you@gmail.com>"
+   ```
+   Gmail allows roughly 500 messages a day on a personal account.
+
+Set `APP_URL` if links in emails should point somewhere other than the host the request came in on.
 
 ## How the ownership score works
 
@@ -88,8 +122,15 @@ If someone has open tasks and no activity for 7+ days they are shown as **Idle**
 src/app/(app)/dashboard        personal dashboard
 src/app/(app)/tasks            list + board, new task, task detail
 src/app/(app)/admin            team overview, teams + team detail, people, person detail, deadline log
+src/app/(app)/account          change password, email notifications
+src/app/{signup,forgot-password,reset-password,invite}   public auth pages
 src/lib/models.ts              Mongoose schemas (User, Session, Team, Task with embedded subtasks/comments/changes/activity)
-src/lib/actions.ts             all mutations (server actions) with permission checks
+src/lib/actions.ts             task, people and team mutations (server actions) with permission checks
+src/lib/authActions.ts         sign-up, invites, password reset and change, notification preference
+src/lib/mail.ts                email transport (Resend, SMTP, or console fallback)
+src/lib/emails.ts              email copy and HTML
+src/lib/tokens.ts              one-time invite and reset tokens (hashed at rest)
+src/lib/notify.ts              assignment notification emails
 src/lib/stats.ts               task health, ownership score, weekly buckets, team aggregates
 src/lib/teams.ts               team membership helpers and per-team summaries
 src/lib/period.ts              day / week window used for completed tasks
