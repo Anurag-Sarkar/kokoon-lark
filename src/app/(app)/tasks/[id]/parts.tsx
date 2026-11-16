@@ -9,6 +9,7 @@ import { PRIORITIES, PRIORITY_LABEL, STATUSES, STATUS_LABEL, type Priority, type
 import { useAction } from "@/components/useAction";
 import { Modal } from "@/components/ui/Modal";
 import { Avatar } from "@/components/ui/Avatar";
+import { UserCheckList } from "@/components/ui/UserCheckList";
 
 function ErrorLine({ error }: { error: string | null }) {
   return error ? <p role="alert" className="text-xs text-critical-text bg-critical-soft rounded-lg px-2.5 py-1.5">{error}</p> : null;
@@ -41,7 +42,11 @@ export function StatusControl({ task, canEdit }: { task: TaskDTO; canEdit: boole
 
 /* ---------------- Deadline ---------------- */
 
-export function DeadlineChanger({ task, canEdit }: { task: TaskDTO; canEdit: boolean }) {
+/**
+ * Admins (`direct`) move the deadline on the spot. Everyone else sends a request to `reviewerLabel`,
+ * and the current deadline keeps counting until it's approved.
+ */
+export function DeadlineChanger({ task, canEdit, direct, reviewerLabel }: { task: TaskDTO; canEdit: boolean; direct: boolean; reviewerLabel: string }) {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(toDatetimeLocal(task.deadline));
   const [reason, setReason] = useState("");
@@ -50,11 +55,15 @@ export function DeadlineChanger({ task, canEdit }: { task: TaskDTO; canEdit: boo
   return (
     <>
       <button type="button" onClick={() => { setValue(toDatetimeLocal(task.deadline)); setReason(""); clearError(); setOpen(true); }} className="btn btn-secondary btn-sm w-full">
-        <CalendarClock className="size-3.5" />Change deadline
+        <CalendarClock className="size-3.5" />{direct ? "Change deadline" : "Ask to change deadline"}
       </button>
-      <Modal open={open} onClose={() => setOpen(false)} title="Change the deadline">
+      <Modal open={open} onClose={() => setOpen(false)} title={direct ? "Change the deadline" : "Ask to change the deadline"}>
         <div className="grid gap-3">
-          <p className="text-xs text-ink-2 leading-relaxed">Deadline changes are logged with your name and reason, and count against your ownership score. Make it a good reason.</p>
+          <p className="text-xs text-ink-2 leading-relaxed">
+            {direct
+              ? "You're an admin, so this applies straight away. It's logged with your name and reason for everyone to see."
+              : `This goes to ${reviewerLabel} for approval. Until it's approved, the current deadline is the one you're measured against. The reason is visible to the team.`}
+          </p>
           <div>
             <label className="label" htmlFor="newDeadline">New deadline</label>
             <input id="newDeadline" type="datetime-local" value={value} onChange={(e) => setValue(e.target.value)} className="input" />
@@ -67,7 +76,7 @@ export function DeadlineChanger({ task, canEdit }: { task: TaskDTO; canEdit: boo
           <div className="flex justify-end gap-2">
             <button type="button" className="btn btn-secondary" onClick={() => setOpen(false)}>Cancel</button>
             <button type="button" className="btn btn-primary" disabled={pending || reason.trim().length < 5} onClick={() => run(() => changeDeadline(task.id, value, reason), () => setOpen(false))}>
-              {pending ? "Saving…" : "Move deadline"}
+              {pending ? "Saving…" : direct ? "Move deadline" : "Send for approval"}
             </button>
           </div>
         </div>
@@ -78,7 +87,7 @@ export function DeadlineChanger({ task, canEdit }: { task: TaskDTO; canEdit: boo
 
 /* ---------------- Assignees ---------------- */
 
-export function AssigneeEditor({ task, users, canEdit }: { task: TaskDTO; users: UserDTO[]; canEdit: boolean }) {
+export function AssigneeEditor({ task, users, canEdit, currentUserId }: { task: TaskDTO; users: UserDTO[]; canEdit: boolean; currentUserId?: string }) {
   const [open, setOpen] = useState(false);
   const [sel, setSel] = useState<string[]>(task.assignees);
   const { run, pending, error, clearError } = useAction();
@@ -87,23 +96,7 @@ export function AssigneeEditor({ task, users, canEdit }: { task: TaskDTO; users:
     <>
       <button type="button" onClick={() => { setSel(task.assignees); clearError(); setOpen(true); }} className="btn btn-ghost btn-xs"><Users className="size-3.5" />Edit</button>
       <Modal open={open} onClose={() => setOpen(false)} title="Who owns this?">
-        <ul className="grid gap-1 max-h-80 overflow-auto scrollbar-thin">
-          {users.map((u) => {
-            const on = sel.includes(u.id);
-            return (
-              <li key={u.id}>
-                <label className={`flex items-center gap-3 rounded-lg px-2 py-1.5 cursor-pointer ${on ? "bg-accent-soft" : "hover:bg-surface-2"}`}>
-                  <input type="checkbox" checked={on} onChange={() => setSel((s) => (on ? s.filter((x) => x !== u.id) : [...s, u.id]))} className="accent-ink size-4" />
-                  <Avatar user={u} size="sm" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-medium truncate">{u.name}</span>
-                    <span className="block text-[11px] text-ink-3 truncate">{u.title || (u.role === "admin" ? "Admin" : "Member")}</span>
-                  </span>
-                </label>
-              </li>
-            );
-          })}
-        </ul>
+        <UserCheckList users={users} selected={sel} onToggle={(id) => setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))} currentUserId={currentUserId} maxHeight="max-h-80" />
         <div className="mt-3 grid gap-2">
           <ErrorLine error={error} />
           <div className="flex justify-end gap-2">

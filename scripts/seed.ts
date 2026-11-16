@@ -56,8 +56,8 @@ async function main() {
   }
 
   await Team.insertMany([
-    { name: "Product", description: "Design and engineering", color: "#2a78d6", members: [ids.priya, ids.rohan, ids.sara] },
-    { name: "Growth & Ops", description: "Marketing, sales and operations", color: "#eb6834", members: [ids.dev, ids.meera] },
+    { name: "Product", description: "Design and engineering", color: "#2a78d6", owner: ids.priya, members: [ids.priya, ids.rohan, ids.sara] },
+    { name: "Growth & Ops", description: "Marketing, sales and operations", color: "#eb6834", owner: ids.dev, members: [ids.dev, ids.meera] },
   ]);
 
   const seeds: Seed[] = [

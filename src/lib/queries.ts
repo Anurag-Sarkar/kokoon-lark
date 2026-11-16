@@ -48,6 +48,13 @@ export async function listTasksForUser(userId: string): Promise<TaskDTO[]> {
   return tasks.map(toTaskDTO);
 }
 
+/** Tasks with a deadline change waiting for review. */
+export async function listTasksWithPendingRequests(): Promise<TaskDTO[]> {
+  await connectDB();
+  const tasks = await Task.find({ "deadlineRequests.status": "pending" }).sort({ deadline: 1 }).lean();
+  return tasks.map(toTaskDTO);
+}
+
 export async function getTask(id: string): Promise<TaskDTO | null> {
   if (!isValidId(id)) return null;
   await connectDB();

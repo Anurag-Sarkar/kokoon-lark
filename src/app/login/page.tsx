@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import { User } from "@/lib/models";
+import { signupDisabled } from "@/lib/signupPolicy";
 import { LoginForm } from "./LoginForm";
 
 export default async function LoginPage() {
@@ -55,6 +56,9 @@ export default async function LoginPage() {
               <p className="mt-1 text-ink-2">Create the first admin account to set up this workspace.</p>
               <Link href="/signup" className="btn btn-primary btn-sm mt-3">Set up workspace</Link>
             </div>
+          )}
+          {!empty && !signupDisabled() && (
+            <p className="mt-6 text-sm text-ink-2 text-center">New here? <Link href="/signup" className="font-medium text-accent-deep hover:underline">Create an account</Link></p>
           )}
         </div>
       </section>

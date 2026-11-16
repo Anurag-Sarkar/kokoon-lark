@@ -3,6 +3,7 @@ import { CheckSquare } from "lucide-react";
 import { taskHealth } from "@/lib/stats";
 import { deadlineDistance, fmtDateTime, latenessLabel } from "@/lib/format";
 import { subtaskProgress } from "@/lib/taskViews";
+import { pendingDeadlineRequest } from "@/lib/approvals";
 import type { TaskDTO, UserDTO } from "@/lib/types";
 import { OwnerList } from "@/components/ui/Avatar";
 import { HealthPill, PriorityMark, StatusPill, Tag } from "@/components/ui/Pills";
@@ -23,6 +24,7 @@ export function TaskRow({ task, users, now, showOwners = true }: { task: TaskDTO
         <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-ink-3">
           <span className={h === "overdue" ? "text-critical-text font-semibold" : h === "due_soon" ? "text-warn-text font-semibold" : ""}>{deadlineText}</span>
           {task.deadlineChanges.length > 0 && <span>· moved {task.deadlineChanges.length}×</span>}
+          {pendingDeadlineRequest(task) && <span className="text-accent-deep font-semibold">· change pending approval</span>}
           {task.tags.slice(0, 3).map((t) => <Tag key={t}>{t}</Tag>)}
           {showOwners && <span className="sm:hidden basis-full text-ink-2">{owners.length ? owners.map((u) => u.name).join(", ") : "Unassigned"}</span>}
         </div>

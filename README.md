@@ -39,12 +39,14 @@ Production: `npm run build && npm start`. Set `MONGODB_URI` (and the email varia
 - Search and filters by status, priority and owner. Scope is **My tasks** / **My team** for members and **My tasks** / **Team** / **Everyone** for admins.
 
 **Teams**
-- Admins create teams, pick a colour, and add or remove people (also from the add-person form).
+- Admins create teams, pick a colour, choose a **team owner**, and add or remove people (also from the add-person form). Member and owner pickers are searchable.
+- The hierarchy is admin → team owner → team member. The owner reviews deadline changes their members ask for; an admin can also be a team member or owner.
 - Members see their team's work on the task list and board, and their Team pulse compares them with their teammates rather than the whole company. Someone in no team sees only their own tasks.
 - The admin overview ranks every team by a team ownership score (the average of its members' scores) with open, overdue, done-this-week and on-time figures; clicking a team opens its own overview with people table, charts and overdue list.
 
 **Deadlines**
-- Changing a deadline requires a written reason. Old date, new date, who, why, and when are stored on the task and shown in the task's deadline history.
+- Changing a deadline requires a written reason. Old date, new date, who, why, who approved, and when are stored on the task and shown in the task's deadline history.
+- **Approval:** admins move deadlines directly. Everyone else sends a request to the level above them: members to their team owner (or any admin), team owners to an admin. Until it is approved, the current deadline is the one the task is measured against; once approved, the new date counts. Reviewers get an email and see the request under **Approvals** (sidebar badge shows how many are waiting), on their dashboard, and on the task itself, where they can approve or turn it down with a note. The requester can withdraw it, and is emailed the decision. Only one request per task can be open at a time.
 - The original deadline is always kept, so "moved 3×" is visible on the task.
 - Every task is classified automatically: on track, due soon (48h), overdue, done on time, done late.
 
@@ -55,7 +57,7 @@ Production: `npm run build && npm start`. Set `MONGODB_URI` (and the email varia
 - Team pulse: your teammates' scores and status side by side (everyone, for admins).
 
 **Accounts and email**
-- First admin signs up at `/signup` (only works while the database has no accounts).
+- First admin signs up at `/signup`. After that anyone can **create their own account** there as a member (the login page links to it); they then appear in People, in the team member picker and in the task owner picker like everyone else. Limit sign-ups to your email domains with `SIGNUP_ALLOWED_DOMAINS`, or turn them off with `SIGNUP_DISABLED=1` to go invite-only.
 - Admins add people from **People** in one of two ways: **email an invite** (a one-time link, valid 7 days, where they choose a password) or **set a temporary password** (emailed to them; they must change it on first sign-in before they can use the app).
 - **Resend invite** for anyone who hasn't set a password yet; the link is also shown on screen to copy.
 - **Forgot password** on the login page emails a one-time reset link valid for 60 minutes. Admins can also set a new temporary password from People.
@@ -65,7 +67,7 @@ Production: `npm run build && npm start`. Set `MONGODB_URI` (and the email varia
 - Team totals, team-by-team cards, sortable people table with every stat, workload chart, team completion trend.
 - Per-team drill-down: team score and verdict, tiles, members ranked by score, charts, overdue list, and member management.
 - Per-person drill-down with their dashboard, their deadline changes, and their tasks.
-- Deadline log across the whole team with reasons and per-person counts.
+- Deadline log across the whole team with reasons, who approved each change, per-person counts, and the requests still waiting.
 - People management: add, set role, deactivate, reset password.
 
 ## Email setup
@@ -147,6 +149,9 @@ src/app/(app)/account          change password, email notifications
 src/app/{signup,forgot-password,reset-password,invite}   public auth pages
 src/lib/models.ts              Mongoose schemas (User, Session, Team, Task with embedded subtasks/comments/changes/activity)
 src/lib/actions.ts             task, people and team mutations (server actions) with permission checks
+src/lib/approvals.ts           who may move a deadline directly, who must ask, and who decides
+src/lib/signupPolicy.ts        self sign-up rules from env (allowed domains, disabled)
+src/app/(app)/approvals        deadline requests waiting for the signed-in reviewer, and their own
 src/lib/authActions.ts         sign-up, invites, password reset and change, notification preference
 src/lib/mail.ts                email transport (Resend, SMTP, or console fallback)
 src/lib/emails.ts              email copy and HTML

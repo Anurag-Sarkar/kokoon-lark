@@ -40,6 +40,8 @@ export interface TeamDTO {
   name: string;
   description: string;
   color: string;
+  /** Team owner: reviews deadline changes asked for by members. Always also a member. */
+  ownerId: string | null;
   members: string[];
   createdAt: string;
 }
@@ -58,7 +60,26 @@ export interface DeadlineChangeDTO {
   oldDeadline: string;
   newDeadline: string;
   reason: string;
+  /** Who asked for the change */
   changedBy: string;
+  /** Who approved it. An admin moving a deadline directly approves it themselves. */
+  approvedBy: string | null;
+  createdAt: string;
+}
+
+export type DeadlineRequestStatus = "pending" | "approved" | "rejected" | "withdrawn";
+
+/** A deadline change waiting for (or decided by) the team owner or an admin. */
+export interface DeadlineRequestDTO {
+  id: string;
+  requestedBy: string;
+  oldDeadline: string;
+  newDeadline: string;
+  reason: string;
+  status: DeadlineRequestStatus;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  note: string;
   createdAt: string;
 }
 
@@ -75,6 +96,10 @@ export type ActivityType =
   | "completed"
   | "reopened"
   | "deadline"
+  | "deadline_requested"
+  | "deadline_approved"
+  | "deadline_rejected"
+  | "deadline_withdrawn"
   | "assignees"
   | "edited"
   | "subtask_added"
@@ -106,6 +131,7 @@ export interface TaskDTO {
   completedBy: string | null;
   subtasks: SubtaskDTO[];
   deadlineChanges: DeadlineChangeDTO[];
+  deadlineRequests: DeadlineRequestDTO[];
   comments: CommentDTO[];
   activity: ActivityDTO[];
   createdAt: string;

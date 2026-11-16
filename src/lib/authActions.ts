@@ -10,6 +10,8 @@ import { consumeToken, INVITE_TTL_MS, issueToken, RESET_TTL_MS } from "./tokens"
 import { appUrl, sendMail } from "./mail";
 import { inviteEmail, resetLinkEmail } from "./emails";
 import { isValidId } from "./queries";
+import { AVATAR_COLORS } from "./palette";
+import { allowedDomainsLabel, signupDisabled, signupEmailAllowed } from "./signupPolicy";
 import type { ActionResult } from "./types";
 
 export type AuthFormState = { error?: string; done?: boolean } | undefined;
@@ -25,7 +27,10 @@ function checkNewPassword(password: string, confirm: string): string | null {
 
 /* ---------------- first account ---------------- */
 
-/** Creates the first admin of an empty workspace. Once anyone exists, accounts come from invites. */
+/**
+ * The first account becomes the admin of an empty workspace. After that anyone can sign up as a member,
+ * unless SIGNUP_DISABLED is set or SIGNUP_ALLOWED_DOMAINS doesn't include their email domain.
+ */
 export async function signup(_prev: AuthFormState, formData: FormData): Promise<AuthFormState> {
   if (await getCurrentUser()) redirect("/dashboard");
   const name = String(formData.get("name") ?? "").trim();
@@ -38,8 +43,20 @@ export async function signup(_prev: AuthFormState, formData: FormData): Promise<
   if (bad) return { error: bad };
 
   await connectDB();
-  if ((await User.countDocuments()) > 0) return { error: "This workspace already has accounts. Ask an admin to invite you." };
-  const user = await User.create({ name, email, role: "admin", title: "Admin", color: "#0b0b0b", passwordHash: await bcrypt.hash(password, 10) });
+  const count = await User.countDocuments();
+  if (count === 0) {
+    const admin = await User.create({ name, email, role: "admin", title: "Admin", color: "#0b0b0b", passwordHash: await bcrypt.hash(password, 10) });
+    await startSession(admin._id.toString());
+    redirect("/dashboard");
+  }
+  if (signupDisabled()) return { error: "Sign-ups are turned off for this workspace. Ask an admin to invite you." };
+  if (!signupEmailAllowed(email)) return { error: `Sign-ups are limited to ${allowedDomainsLabel()} email addresses.` };
+  if (await User.exists({ email })) return { error: "There's already an account with that email. Sign in instead, or use “Forgot password”." };
+  const user = await User.create({
+    name, email, role: "member", title: "",
+    color: AVATAR_COLORS[count % AVATAR_COLORS.length],
+    passwordHash: await bcrypt.hash(password, 10),
+  });
   await startSession(user._id.toString());
   redirect("/dashboard");
 }

@@ -20,6 +20,8 @@ export interface KanbanCard {
   subDone: number;
   subTotal: number;
   canEdit: boolean;
+  /** a deadline change is waiting for approval */
+  pendingDeadline: boolean;
 }
 
 const TONE: Record<KanbanCard["deadlineTone"], string> = {
@@ -79,6 +81,7 @@ export function KanbanBoard({ cards: initial, columns = STATUSES, doneLabel }: {
                       <div className="min-w-0 flex-1">
                         <Link href={`/tasks/${c.id}`} className="text-sm font-medium leading-snug hover:underline block">{c.title}</Link>
                         <div className={`mt-1 text-[11px] font-medium ${TONE[c.deadlineTone]}`}>{c.deadlineLabel}</div>
+                        {c.pendingDeadline && <div className="mt-0.5 text-[11px] font-semibold text-accent-deep">Deadline change pending approval</div>}
                       </div>
                       <PriorityMark priority={c.priority} />
                     </div>

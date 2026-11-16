@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { CalendarClock, LayoutDashboard, ListTodo, LogOut, Plus, SquareKanban, UserCog, Users, UsersRound } from "lucide-react";
+import { CalendarClock, ClipboardCheck, LayoutDashboard, ListTodo, LogOut, Plus, SquareKanban, UserCog, Users, UsersRound } from "lucide-react";
 import { logout } from "@/lib/actions";
 import type { UserDTO } from "@/lib/types";
 import { Avatar } from "@/components/ui/Avatar";
 
-type Item = { href: string; label: string; icon: React.ComponentType<{ className?: string }>; match: (path: string, view: string | null) => boolean };
+type Item = { href: string; label: string; icon: React.ComponentType<{ className?: string }>; match: (path: string, view: string | null) => boolean; badge?: number };
 
-export function Sidebar({ user }: { user: UserDTO }) {
+/** `approvals.show` is true for admins and team owners; `count` is how many requests wait on this person. */
+export function Sidebar({ user, approvals }: { user: UserDTO; approvals?: { show: boolean; count: number } }) {
   const path = usePathname();
   const view = useSearchParams().get("view");
 
@@ -17,6 +18,7 @@ export function Sidebar({ user }: { user: UserDTO }) {
     { href: "/dashboard", label: "My dashboard", icon: LayoutDashboard, match: (p) => p === "/dashboard" },
     { href: "/tasks", label: "Tasks", icon: ListTodo, match: (p, v) => p === "/tasks" && v !== "board" },
     { href: "/tasks?view=board", label: "Board", icon: SquareKanban, match: (p, v) => p === "/tasks" && v === "board" },
+    ...(approvals?.show ? [{ href: "/approvals", label: "Approvals", icon: ClipboardCheck, match: (p: string) => p === "/approvals", badge: approvals.count } as Item] : []),
   ];
   const admin: Item[] = [
     { href: "/admin", label: "Team overview", icon: Users, match: (p) => p === "/admin" || p.startsWith("/admin/people/") },
@@ -26,10 +28,11 @@ export function Sidebar({ user }: { user: UserDTO }) {
   ];
 
   const render = (items: Item[]) =>
-    items.map(({ href, label, icon: Icon, match }) => (
+    items.map(({ href, label, icon: Icon, match, badge }) => (
       <Link key={href} href={href} className="nav-link" data-active={match(path, view)}>
         <Icon className="size-4 shrink-0" />
         <span className="truncate">{label}</span>
+        {badge ? <span className="ml-auto inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-accent text-white text-[10px] font-semibold tnum" aria-label={`${badge} waiting`}>{badge}</span> : null}
       </Link>
     ));
 

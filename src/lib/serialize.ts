@@ -26,6 +26,7 @@ export function toTeamDTO(t: TeamDoc): TeamDTO {
     name: t.name,
     description: t.description ?? "",
     color: t.color ?? "#2a78d6",
+    ownerId: t.owner ? t.owner.toString() : null,
     members: (t.members ?? []).map((m) => m.toString()),
     createdAt: isoReq(t.createdAt),
   };
@@ -59,7 +60,20 @@ export function toTaskDTO(t: TaskDoc): TaskDTO {
       newDeadline: isoReq(d.newDeadline),
       reason: d.reason,
       changedBy: d.changedBy.toString(),
+      approvedBy: d.approvedBy ? d.approvedBy.toString() : null,
       createdAt: isoReq(d.createdAt),
+    })),
+    deadlineRequests: (t.deadlineRequests ?? []).map((r) => ({
+      id: r._id.toString(),
+      requestedBy: r.requestedBy.toString(),
+      oldDeadline: isoReq(r.oldDeadline),
+      newDeadline: isoReq(r.newDeadline),
+      reason: r.reason,
+      status: r.status ?? "pending",
+      reviewedBy: r.reviewedBy ? r.reviewedBy.toString() : null,
+      reviewedAt: iso(r.reviewedAt),
+      note: r.note ?? "",
+      createdAt: isoReq(r.createdAt),
     })),
     comments: (t.comments ?? []).map((c) => ({
       id: c._id.toString(),

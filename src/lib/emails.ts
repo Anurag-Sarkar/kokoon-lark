@@ -95,3 +95,39 @@ export function assignedEmail(p: { name: string; taskTitle: string; byName: stri
     ),
   };
 }
+
+export function deadlineRequestEmail(p: { name: string; requesterName: string; taskTitle: string; oldLabel: string; newLabel: string; shift: string; reason: string; link: string }): MailContent {
+  const first = p.name.split(" ")[0];
+  return {
+    subject: `${p.requesterName} wants to move a deadline: ${p.taskTitle}`,
+    text: `Hi ${first},\n\n${p.requesterName} asked to move the deadline of "${p.taskTitle}" (${p.shift}):\n${p.oldLabel} → ${p.newLabel}\n\nReason: ${p.reason}\n\nThe current deadline stays until you approve or turn this down:\n${p.link}`,
+    html: layout(
+      `${esc(p.requesterName)} wants to move a deadline`,
+      [
+        `Hi ${esc(first)},`,
+        `${esc(p.requesterName)} asked to move the deadline of <strong>${esc(p.taskTitle)}</strong> (${esc(p.shift)}).`,
+        `<span style="display:block;background:#f6f6f3;border-radius:10px;padding:12px 14px;font-size:14px">${esc(p.oldLabel)} &rarr; <strong>${esc(p.newLabel)}</strong><br><span style="color:#7a7a76">Reason:</span> ${esc(p.reason)}</span>`,
+        `The current deadline keeps counting until you decide.`,
+      ],
+      { href: p.link, label: "Review the request" },
+      "You're getting this because you own this person's team, or you're an admin."
+    ),
+  };
+}
+
+export function deadlineDecisionEmail(p: { name: string; reviewerName: string; taskTitle: string; approved: boolean; oldLabel: string; newLabel: string; note: string; link: string }): MailContent {
+  const first = p.name.split(" ")[0];
+  const heading = p.approved ? `Deadline approved: ${p.taskTitle}` : `Deadline change not approved: ${p.taskTitle}`;
+  const line = p.approved
+    ? `${p.reviewerName} approved your request. The deadline is now ${p.newLabel} and that's the date you'll be measured against.`
+    : `${p.reviewerName} turned down your request to move the deadline to ${p.newLabel}. It stays ${p.oldLabel}.`;
+  return {
+    subject: heading,
+    text: `Hi ${first},\n\n${line}${p.note ? `\n\nNote from ${p.reviewerName}: ${p.note}` : ""}\n\nOpen the task: ${p.link}`,
+    html: layout(
+      heading,
+      [`Hi ${esc(first)},`, esc(line), ...(p.note ? [`<span style="display:block;background:#f6f6f3;border-radius:10px;padding:12px 14px;font-size:14px"><span style="color:#7a7a76">Note from ${esc(p.reviewerName)}:</span> ${esc(p.note)}</span>`] : [])],
+      { href: p.link, label: "Open the task" }
+    ),
+  };
+}

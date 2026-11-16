@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { createTask, type FormState } from "@/lib/actions";
 import { PRIORITIES, PRIORITY_LABEL, type UserDTO } from "@/lib/types";
-import { Avatar } from "@/components/ui/Avatar";
+import { UserCheckList } from "@/components/ui/UserCheckList";
 
 export function NewTaskForm({ users, defaultDeadline, currentUserId }: { users: UserDTO[]; defaultDeadline: string; currentUserId: string }) {
   const [state, action, pending] = useActionState<FormState, FormData>(createTask, undefined);
@@ -58,27 +58,8 @@ export function NewTaskForm({ users, defaultDeadline, currentUserId }: { users: 
         </div>
 
         <div className="card p-5">
-          <div className="flex items-center justify-between mb-2">
-            <span className="label mb-0">Owners</span>
-            <span className="text-[11px] text-ink-3">{selected.length} selected</span>
-          </div>
-          <ul className="grid gap-1 max-h-72 overflow-auto scrollbar-thin -mx-1 px-1">
-            {users.map((u) => {
-              const on = selected.includes(u.id);
-              return (
-                <li key={u.id}>
-                  <label className={`flex items-center gap-3 rounded-lg px-2 py-1.5 cursor-pointer transition ${on ? "bg-accent-soft" : "hover:bg-surface-2"}`}>
-                    <input type="checkbox" name="assignees" value={u.id} checked={on} onChange={() => toggle(u.id)} className="accent-ink size-4" />
-                    <Avatar user={u} size="sm" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-medium truncate">{u.name}{u.id === currentUserId ? " (you)" : ""}</span>
-                      <span className="block text-[11px] text-ink-3 truncate">{u.title || (u.role === "admin" ? "Admin" : "Member")}</span>
-                    </span>
-                  </label>
-                </li>
-              );
-            })}
-          </ul>
+          <div className="mb-2"><span className="label mb-0">Owners</span></div>
+          <UserCheckList users={users} selected={selected} onToggle={toggle} name="assignees" currentUserId={currentUserId} />
         </div>
 
         {state?.error && <p role="alert" className="text-sm text-critical-text bg-critical-soft rounded-lg px-3 py-2">{state.error}</p>}

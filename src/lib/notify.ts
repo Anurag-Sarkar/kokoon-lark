@@ -2,8 +2,8 @@ import { Types } from "mongoose";
 import { connectDB } from "./mongodb";
 import { User, type TaskDoc } from "./models";
 import { appUrl, sendMail } from "./mail";
-import { assignedEmail } from "./emails";
-import { fmtShortDateTime } from "./format";
+import { assignedEmail, deadlineDecisionEmail, deadlineRequestEmail } from "./emails";
+import { fmtShortDateTime, shiftLabel } from "./format";
 import { PRIORITY_LABEL } from "./types";
 
 /** Emails everyone newly assigned to a task (never the person doing the assigning). Never throws. */
@@ -42,5 +42,74 @@ export async function notifyAssigned(
     );
   } catch (err) {
     console.error("[notify] assignment emails failed:", err);
+  }
+}
+
+async function mailableUsers(ids: string[], exceptId: string) {
+  const targets = ids.filter((id) => id !== exceptId);
+  if (targets.length === 0) return [];
+  await connectDB();
+  return User.find({
+    _id: { $in: targets.map((t) => new Types.ObjectId(t)) },
+    active: { $ne: false },
+    emailNotifications: { $ne: false },
+  }).select("name email").lean();
+}
+
+/** Emails everyone who can approve a deadline request. Never throws. */
+export async function notifyDeadlineRequest(
+  task: Pick<TaskDoc, "_id" | "title">,
+  req: { oldDeadline: Date; newDeadline: Date; reason: string },
+  requester: { id: string; name: string },
+  reviewerIds: string[]
+): Promise<void> {
+  try {
+    const users = await mailableUsers(reviewerIds, requester.id);
+    if (users.length === 0) return;
+    const link = `${await appUrl()}/tasks/${task._id.toString()}`;
+    const oldIso = new Date(req.oldDeadline).toISOString();
+    const newIso = new Date(req.newDeadline).toISOString();
+    await Promise.allSettled(
+      users.map((u) =>
+        sendMail({
+          to: u.email,
+          ...deadlineRequestEmail({
+            name: u.name, requesterName: requester.name, taskTitle: task.title,
+            oldLabel: fmtShortDateTime(oldIso), newLabel: fmtShortDateTime(newIso), shift: shiftLabel(oldIso, newIso),
+            reason: req.reason, link,
+          }),
+        })
+      )
+    );
+  } catch (err) {
+    console.error("[notify] deadline request emails failed:", err);
+  }
+}
+
+/** Tells the requester how their deadline request was decided. Never throws. */
+export async function notifyDeadlineDecision(
+  task: Pick<TaskDoc, "_id" | "title">,
+  req: { oldDeadline: Date; newDeadline: Date },
+  reviewer: { id: string; name: string },
+  requesterId: string,
+  approved: boolean,
+  note: string
+): Promise<void> {
+  try {
+    const users = await mailableUsers([requesterId], reviewer.id);
+    if (users.length === 0) return;
+    const link = `${await appUrl()}/tasks/${task._id.toString()}`;
+    const u = users[0]!;
+    await sendMail({
+      to: u.email,
+      ...deadlineDecisionEmail({
+        name: u.name, reviewerName: reviewer.name, taskTitle: task.title, approved,
+        oldLabel: fmtShortDateTime(new Date(req.oldDeadline).toISOString()),
+        newLabel: fmtShortDateTime(new Date(req.newDeadline).toISOString()),
+        note, link,
+      }),
+    });
+  } catch (err) {
+    console.error("[notify] deadline decision email failed:", err);
   }
 }

@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, CalendarClock, History, MessageSquare, ListChecks } from "lucide-react";
+import { ArrowLeft, CalendarClock, History, Hourglass, MessageSquare, ListChecks } from "lucide-react";
 import { requireUser } from "@/lib/auth";
-import { getTask, listUsers, userMap } from "@/lib/queries";
+import { getTask, listTeams, listUsers, userMap } from "@/lib/queries";
 import { taskHealth } from "@/lib/stats";
+import { canReview, changesApplyDirectly, pendingDeadlineRequest, reviewerLabel, reviewersFor } from "@/lib/approvals";
+import { ReviewButtons } from "@/components/approvals/ReviewButtons";
 import { deadlineDistance, fmtDateTime, fmtShortDateTime, latenessLabel, shiftLabel, timeAgo } from "@/lib/format";
 import { PRIORITY_LABEL, type UserDTO } from "@/lib/types";
 import { Avatar } from "@/components/ui/Avatar";
@@ -13,7 +15,7 @@ import { AssigneeEditor, CommentBox, DeadlineChanger, DeleteTaskButton, StatusCo
 export default async function TaskPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await requireUser();
-  const [task, users] = await Promise.all([getTask(id), listUsers({ includeInactive: true })]);
+  const [task, users, teams] = await Promise.all([getTask(id), listUsers({ includeInactive: true }), listTeams()]);
   if (!task) notFound();
   const now = new Date();
   const umap = userMap(users);
@@ -27,6 +29,13 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   const timeline = [...task.activity].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   const isDone = task.status === "done";
   const moved = task.deadlineChanges.length > 0;
+  const pending = pendingDeadlineRequest(task);
+  const direct = changesApplyDirectly(user);
+  const myReviewers = direct ? "" : reviewerLabel(reviewersFor(user.id, users, teams));
+  const requester = pending ? umap.get(pending.requestedBy) ?? null : null;
+  const canDecide = pending ? canReview(user, pending.requestedBy, teams) : false;
+  const canWithdraw = pending ? pending.requestedBy === user.id || user.role === "admin" : false;
+  const waitingOn = pending ? reviewerLabel(reviewersFor(pending.requestedBy, users, teams)) : "";
 
   return (
     <div className="grid grid-cols-1 gap-5">
@@ -46,6 +55,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
                   <StatusPill status={task.status} />
                   {isDone ? <HealthPill health={h} /> : h !== "on_track" && <HealthPill health={h} label={dist.label} />}
                   {moved && <span className="pill bg-warn-soft text-warn-text"><CalendarClock className="size-3.5" />Deadline moved {task.deadlineChanges.length}×</span>}
+                  {pending && <span className="pill bg-accent-soft text-accent-deep"><Hourglass className="size-3.5" />Deadline change pending</span>}
                 </div>
                 <h1 className="text-2xl font-semibold tracking-tight leading-tight">{task.title}</h1>
                 {task.description ? <p className="mt-3 text-sm text-ink-2 leading-relaxed whitespace-pre-wrap">{task.description}</p> : <p className="mt-3 text-sm text-ink-3 italic">No description.</p>}
@@ -97,14 +107,25 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
               {!isDone && <div className={`text-xs font-semibold mt-0.5 ${dist.tone === "overdue" ? "text-critical-text" : dist.tone === "soon" ? "text-warn-text" : "text-ink-3"}`}>{dist.label}</div>}
               {moved && <div className="text-[11px] text-ink-3 mt-1">Originally {fmtShortDateTime(task.originalDeadline)}</div>}
             </div>
-            <DeadlineChanger task={task} canEdit={canEdit} />
+            {pending ? (
+              <div className="rounded-xl border border-accent/40 bg-accent-soft p-3 grid gap-2 text-xs">
+                <div className="flex items-center gap-1.5 font-semibold text-accent-deep"><Hourglass className="size-3.5" />Waiting for approval</div>
+                <div className="text-ink-2"><span className="font-semibold text-ink">{requester?.name ?? "Someone"}</span> asked {timeAgo(pending.createdAt, now)} · {shiftLabel(task.deadline, pending.newDeadline)}</div>
+                <div className="font-semibold text-ink">{fmtShortDateTime(task.deadline)} → {fmtShortDateTime(pending.newDeadline)}</div>
+                <div className="rounded-md bg-surface px-2 py-1 text-ink-2">“{pending.reason}”</div>
+                <div className="text-ink-3">The current deadline counts until {canDecide ? "you decide" : `${waitingOn} decides`}.</div>
+                <ReviewButtons taskId={task.id} requestId={pending.id} canReview={canDecide} canWithdraw={canWithdraw} />
+              </div>
+            ) : (
+              <DeadlineChanger task={task} canEdit={canEdit} direct={direct} reviewerLabel={myReviewers} />
+            )}
             {moved && (
               <ol className="grid gap-2 border-t border-line pt-3">
                 {[...task.deadlineChanges].reverse().map((d) => {
                   const who = umap.get(d.changedBy);
                   return (
                     <li key={d.id} className="text-xs">
-                      <div className="flex items-center gap-1.5 text-ink-2">{who && <Avatar user={who} size="xs" />}<span className="font-semibold">{who?.name ?? "Someone"}</span><span className="text-ink-3">{shiftLabel(d.oldDeadline, d.newDeadline)} · {timeAgo(d.createdAt, now)}</span></div>
+                      <div className="flex items-center gap-1.5 text-ink-2">{who && <Avatar user={who} size="xs" />}<span className="font-semibold">{who?.name ?? "Someone"}</span><span className="text-ink-3">{shiftLabel(d.oldDeadline, d.newDeadline)} · {timeAgo(d.createdAt, now)}{d.approvedBy && d.approvedBy !== d.changedBy ? ` · approved by ${umap.get(d.approvedBy)?.name.split(" ")[0] ?? "admin"}` : ""}</span></div>
                       <div className="mt-0.5 text-ink-3">{fmtShortDateTime(d.oldDeadline)} → {fmtShortDateTime(d.newDeadline)}</div>
                       <div className="mt-1 rounded-md bg-warn-soft text-warn-text px-2 py-1">“{d.reason}”</div>
                     </li>
@@ -117,7 +138,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           <section className="card p-4 grid gap-3">
             <div className="flex items-center justify-between">
               <div className="text-xs font-semibold text-ink-3 uppercase tracking-wider">Owners</div>
-              <AssigneeEditor task={task} users={activeUsers} canEdit={canEdit} />
+              <AssigneeEditor task={task} users={activeUsers} canEdit={canEdit} currentUserId={user.id} />
             </div>
             <ul className="grid gap-2">
               {owners.map((u) => (
@@ -138,7 +159,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
             <ol className="grid gap-3 max-h-[420px] overflow-auto scrollbar-thin pr-1">
               {timeline.map((a) => {
                 const u = umap.get(a.userId);
-                const tone = a.type === "deadline" ? "bg-warn" : a.type === "completed" ? "bg-good" : a.type === "reopened" ? "bg-critical" : "bg-line-2";
+                const tone = a.type === "deadline_approved" ? "bg-good" : a.type === "deadline_rejected" ? "bg-critical" : a.type.startsWith("deadline") ? "bg-warn" : a.type === "completed" ? "bg-good" : a.type === "reopened" ? "bg-critical" : "bg-line-2";
                 return (
                   <li key={a.id} className="relative pl-5 text-xs">
                     <span className={`absolute left-0 top-1.5 size-2.5 rounded-full ${tone}`} aria-hidden />

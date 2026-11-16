@@ -1,5 +1,5 @@
 import mongoose, { Schema, Types, type Model } from "mongoose";
-import type { ActivityType, Priority, Role, Status } from "./types";
+import type { ActivityType, DeadlineRequestStatus, Priority, Role, Status } from "./types";
 
 /* ---------- Raw document shapes (what .lean() returns) ---------- */
 
@@ -42,6 +42,8 @@ export interface TeamDoc {
   name: string;
   description: string;
   color: string;
+  /** Reviews deadline changes asked for by members; always also a member */
+  owner: Types.ObjectId | null;
   members: Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
@@ -62,6 +64,20 @@ export interface DeadlineChangeDoc {
   newDeadline: Date;
   reason: string;
   changedBy: Types.ObjectId;
+  approvedBy: Types.ObjectId | null;
+  createdAt: Date;
+}
+
+export interface DeadlineRequestDoc {
+  _id: Types.ObjectId;
+  requestedBy: Types.ObjectId;
+  oldDeadline: Date;
+  newDeadline: Date;
+  reason: string;
+  status: DeadlineRequestStatus;
+  reviewedBy: Types.ObjectId | null;
+  reviewedAt: Date | null;
+  note: string;
   createdAt: Date;
 }
 
@@ -95,6 +111,7 @@ export interface TaskDoc {
   completedBy: Types.ObjectId | null;
   subtasks: SubtaskDoc[];
   deadlineChanges: DeadlineChangeDoc[];
+  deadlineRequests: DeadlineRequestDoc[];
   comments: CommentDoc[];
   activity: ActivityDoc[];
   createdAt: Date;
@@ -145,11 +162,13 @@ const TeamSchema = new Schema<TeamDoc>(
     name: { type: String, required: true, trim: true },
     description: { type: String, default: "" },
     color: { type: String, default: "#2a78d6" },
+    owner: { type: Schema.Types.ObjectId, ref: "User", default: null },
     members: [{ type: Schema.Types.ObjectId, ref: "User" }],
   },
   { timestamps: true }
 );
 TeamSchema.index({ members: 1 });
+TeamSchema.index({ owner: 1 });
 
 const SubtaskSchema = new Schema<SubtaskDoc>({
   title: { type: String, required: true, trim: true },
@@ -164,6 +183,19 @@ const DeadlineChangeSchema = new Schema<DeadlineChangeDoc>({
   newDeadline: { type: Date, required: true },
   reason: { type: String, required: true, trim: true },
   changedBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
+  approvedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+  createdAt: { type: Date, default: () => new Date() },
+});
+
+const DeadlineRequestSchema = new Schema<DeadlineRequestDoc>({
+  requestedBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
+  oldDeadline: { type: Date, required: true },
+  newDeadline: { type: Date, required: true },
+  reason: { type: String, required: true, trim: true },
+  status: { type: String, enum: ["pending", "approved", "rejected", "withdrawn"], default: "pending" },
+  reviewedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+  reviewedAt: { type: Date, default: null },
+  note: { type: String, default: "" },
   createdAt: { type: Date, default: () => new Date() },
 });
 
@@ -203,6 +235,7 @@ const TaskSchema = new Schema<TaskDoc>(
     completedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
     subtasks: [SubtaskSchema],
     deadlineChanges: [DeadlineChangeSchema],
+    deadlineRequests: [DeadlineRequestSchema],
     comments: [CommentSchema],
     activity: [ActivitySchema],
   },
@@ -211,6 +244,7 @@ const TaskSchema = new Schema<TaskDoc>(
 TaskSchema.index({ assignees: 1, status: 1 });
 TaskSchema.index({ deadline: 1 });
 TaskSchema.index({ createdBy: 1 });
+TaskSchema.index({ "deadlineRequests.status": 1 });
 
 /* ---------- Models (HMR-safe) ---------- */
 

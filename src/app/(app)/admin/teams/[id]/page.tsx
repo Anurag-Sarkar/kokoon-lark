@@ -36,6 +36,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
   const s = summarizeTeam(team, active, tasks, now);
   const { stats } = s;
   const delta = stats.completedThisWeek - stats.completedLastWeek;
+  const owner = team.ownerId ? umap.get(team.ownerId) ?? null : null;
 
   const rows: PersonRow[] = stats.people.map((p) => {
     const u = umap.get(p.userId)!;
@@ -56,7 +57,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
         <Link href="/admin/teams" className="inline-flex items-center gap-1.5 text-sm text-ink-2 hover:text-ink mb-4"><ArrowLeft className="size-4" />Teams</Link>
         <PageHeader
           title={<span className="inline-flex items-center gap-3"><span className="size-4 rounded-full shrink-0" style={{ backgroundColor: team.color }} aria-hidden />{team.name}</span>}
-          subtitle={`${s.members.length} ${s.members.length === 1 ? "person" : "people"}${team.description ? ` · ${team.description}` : ""}`}
+          subtitle={`${s.members.length} ${s.members.length === 1 ? "person" : "people"}${team.description ? ` · ${team.description}` : ""} · ${owner ? `Owner: ${owner.name}` : "No owner yet, so members' deadline changes go to an admin"}`}
           actions={<><Link href={`/tasks?scope=team&team=${team.id}&view=board`} className="btn btn-secondary"><SquareKanban className="size-4" />Board</Link><TeamSettings team={team} users={allUsers.filter((u) => u.active || team.members.includes(u.id))} /></>}
         />
       </div>

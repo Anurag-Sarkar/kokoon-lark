@@ -7,6 +7,7 @@ import { OwnerList } from "@/components/ui/Avatar";
 
 export function TeamCard({ summary: s }: { summary: TeamSummary }) {
   const { team, members, stats } = s;
+  const owner = team.ownerId ? members.find((m) => m.id === team.ownerId) ?? null : null;
   const cells: { label: string; value: string | number; cls: string }[] = [
     { label: "Open", value: stats.activeTasks, cls: "" },
     { label: "Overdue", value: stats.overdueTasks, cls: stats.overdueTasks > 0 ? "text-critical-text" : "" },
@@ -19,6 +20,7 @@ export function TeamCard({ summary: s }: { summary: TeamSummary }) {
         <div className="min-w-0">
           <div className="text-sm font-semibold truncate">{team.name}</div>
           <div className="text-xs text-ink-3 mt-0.5 truncate">{members.length} {members.length === 1 ? "person" : "people"}{team.description ? ` · ${team.description}` : ""}</div>
+          <div className="text-xs mt-0.5 truncate">{owner ? <><span className="text-ink-3">Owner · </span><span className="font-medium text-ink-2">{owner.name}</span></> : <span className="text-warn-text">No owner yet</span>}</div>
           <div className="mt-2 flex items-center gap-2">
             <LevelPill level={s.level} size="sm" />
             {s.needNudge > 0 && <span className="text-[11px] font-semibold text-critical-text">{s.needNudge} need{s.needNudge === 1 ? "s" : ""} a nudge</span>}

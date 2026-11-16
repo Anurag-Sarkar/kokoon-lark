@@ -26,7 +26,7 @@ function PasswordPair({ label = "New password", autoFocus = false }: { label?: s
   );
 }
 
-export function SignupForm() {
+export function SignupForm({ first = false }: { first?: boolean }) {
   const [state, action, pending] = useActionState<AuthFormState, FormData>(signup, undefined);
   return (
     <form action={action} className="grid gap-4">
@@ -34,7 +34,7 @@ export function SignupForm() {
       <div><label className="label" htmlFor="email">Work email</label><input id="email" name="email" type="email" autoComplete="email" required className="input" placeholder="you@company.com" /></div>
       <PasswordPair label="Password" />
       <ErrorBox error={state?.error} />
-      <button type="submit" className="btn btn-primary h-10" disabled={pending}>{pending ? "Creating…" : "Create admin account"}</button>
+      <button type="submit" className="btn btn-primary h-10" disabled={pending}>{pending ? "Creating…" : first ? "Create admin account" : "Create account"}</button>
     </form>
   );
 }

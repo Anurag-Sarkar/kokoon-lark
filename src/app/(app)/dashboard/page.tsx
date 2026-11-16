@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { format } from "date-fns";
-import { Plus } from "lucide-react";
+import { Hourglass, Plus } from "lucide-react";
+import { canReview, pendingDeadlineRequest } from "@/lib/approvals";
 import { requireUser } from "@/lib/auth";
 import { listAllTasks, listTeams, listUsers, userMap } from "@/lib/queries";
 import { peerIds, teamsOf } from "@/lib/teams";
@@ -29,6 +30,8 @@ export default async function DashboardPage() {
     ? `${myTeams.map((t) => t.name).join(" · ")} · everyone in your team sees the same picture.`
     : user.role === "admin" ? "Everyone, ranked by ownership score. Click a person to drill in." : "You're not in a team yet, so this is everyone.";
   const people = pulseUsers.map((u) => ({ user: u, stats: u.id === user.id ? stats : computeUserStats(u.id, tasks, now) }));
+  const toReview = tasks.filter((t) => { const r = pendingDeadlineRequest(t); return !!r && canReview(user, r.requestedBy, teams); }).length;
+  const waiting = tasks.filter((t) => pendingDeadlineRequest(t)?.requestedBy === user.id).length;
   const hour = now.getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
@@ -39,6 +42,27 @@ export default async function DashboardPage() {
         subtitle={`${format(now, "EEEE, MMMM d")} · here's an honest look at your work.`}
         actions={<Link href="/tasks/new" className="btn btn-primary"><Plus className="size-4" />New task</Link>}
       />
+
+      {toReview > 0 && (
+        <Link href="/approvals" className="card p-4 flex items-center gap-3 border-l-4 border-l-accent hover:border-line-2 transition">
+          <Hourglass className="size-5 text-accent-deep shrink-0" />
+          <div className="min-w-0">
+            <div className="text-sm font-semibold">{toReview} deadline {toReview === 1 ? "change needs" : "changes need"} your approval</div>
+            <div className="text-xs text-ink-3">The current deadlines keep counting until you decide.</div>
+          </div>
+          <span className="ml-auto text-xs font-semibold text-accent-deep whitespace-nowrap">Review →</span>
+        </Link>
+      )}
+      {waiting > 0 && (
+        <Link href="/approvals" className="card p-4 flex items-center gap-3 border-l-4 border-l-warn hover:border-line-2 transition">
+          <Hourglass className="size-5 text-warn-text shrink-0" />
+          <div className="min-w-0">
+            <div className="text-sm font-semibold">{waiting} of your deadline {waiting === 1 ? "change is" : "changes are"} waiting for approval</div>
+            <div className="text-xs text-ink-3">Until it's approved, the current deadline is the one that counts.</div>
+          </div>
+          <span className="ml-auto text-xs font-semibold text-accent-deep whitespace-nowrap">See status →</span>
+        </Link>
+      )}
 
       <PulseCard user={user} stats={stats} isSelf now={now} />
 
