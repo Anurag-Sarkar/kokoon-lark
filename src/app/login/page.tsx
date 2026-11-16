@@ -8,10 +8,10 @@ import { LoginForm } from "./LoginForm";
 export default async function LoginPage() {
   const user = await getCurrentUser();
   if (user) redirect("/dashboard");
-  let empty = false, seeded = false;
+  let empty = false;
   try {
     await connectDB();
-    [empty, seeded] = await Promise.all([User.countDocuments().then((n) => n === 0), User.exists({ email: "admin@kokoon.ai" }).then((x) => !!x)]);
+    empty = (await User.countDocuments()) === 0;
   } catch {
     /* login form still renders; the action reports the DB error */
   }
@@ -55,14 +55,6 @@ export default async function LoginPage() {
               <p className="mt-1 text-ink-2">Create the first admin account to set up this workspace.</p>
               <Link href="/signup" className="btn btn-primary btn-sm mt-3">Set up workspace</Link>
             </div>
-          )}
-          {seeded && (
-          <div className="mt-8 rounded-xl border border-line bg-surface p-4 text-xs text-ink-2 leading-relaxed">
-            <p className="font-semibold text-ink mb-1">Demo accounts</p>
-            <p>Admin: <span className="font-mono">admin@kokoon.ai</span> / <span className="font-mono">admin123</span></p>
-            <p>Member: <span className="font-mono">priya@kokoon.ai</span> / <span className="font-mono">password123</span></p>
-            <p className="mt-1 text-ink-3">Also rohan@, sara@, dev@, meera@ with the same password.</p>
-          </div>
           )}
         </div>
       </section>
