@@ -25,7 +25,7 @@ Demo logins after seeding:
 
 To start from a clean database instead of demo data, skip `npm run seed`: with no accounts in the database the login page offers **Set up workspace**, which creates the first admin at `/signup`. After that, everyone else joins by invite.
 
-Production: `npm run build && npm start`. Set `MONGODB_URI` in the environment.
+Production: `npm run build && npm start`. Set `MONGODB_URI` (and the email variables) in the environment. See **Deploy** below for the EC2 setup this repo ships with.
 
 ## What it does
 
@@ -116,6 +116,25 @@ score = 40 × reliability + 45 × overdue + 15 × activity
 
 If someone has open tasks and no activity for 7+ days they are shown as **Idle** and their score is capped at 60, regardless of history. Deadline moves are counted and shown but do not directly change the score; the pattern is surfaced to the admin instead.
 
+## Deploy
+
+The app runs on a single EC2 instance (Amazon Linux 2023) behind nginx, managed by pm2. Every push to `main` redeploys it through GitHub Actions.
+
+**On the instance (one-time):** install `nodejs22`, `git`, `nginx` and `pm2`; clone the repo to `~/kokoon-lark`; put the real values in `~/kokoon-lark/.env.local` (never committed) and add `APP_URL=http://<public-ip-or-domain>` so links in emails point at the live site; run `npm ci && npm run build`; start it with `pm2 start npm --name kokoon -- start && pm2 save && pm2 startup`; proxy port 80 to 3000 with nginx. MongoDB stays on Atlas: allow the instance's public IP under Atlas → Network Access.
+
+**GitHub Actions:** `.github/workflows/deploy.yml` runs on every push to `main` (or manually from the Actions tab). It SSHes into the instance and runs `scripts/deploy.sh`, which builds the new commit in a staging copy (`~/kokoon-lark-stage`), swaps it in, restarts pm2, health-checks `/login`, and swaps the old copy back if the check fails. Env values come from the `.env.local` already on the server, so the only secret in GitHub is the SSH key.
+
+Repository settings the workflow needs (Settings → Secrets and variables → Actions):
+
+| Kind     | Name              | Value                                                                                  |
+|----------|-------------------|----------------------------------------------------------------------------------------|
+| Secret   | `EC2_SSH_KEY`     | private half of a dedicated deploy key pair; its public half goes in `~/.ssh/authorized_keys` on the instance |
+| Variable | `EC2_HOST`        | instance public IP or DNS name                                                          |
+| Variable | `EC2_USER`        | SSH user (`ec2-user` on Amazon Linux)                                                   |
+| Variable | `EC2_KNOWN_HOSTS` | output of `ssh-keyscan -t ed25519 <host>`                                               |
+
+The security group must allow inbound 22 (for the workflow) and 80/443 (for users).
+
 ## Project layout
 
 ```
@@ -136,6 +155,8 @@ src/lib/teams.ts               team membership helpers and per-team summaries
 src/lib/period.ts              day / week window used for completed tasks
 src/lib/queries.ts             reads, returning plain DTOs
 scripts/seed.ts                demo data generator
+scripts/deploy.sh              server-side deploy: staged build, swap, health check, rollback
+.github/workflows/deploy.yml   push-to-main deployment over SSH
 ```
 
 Permissions: admins can do everything. Members can create tasks, and edit tasks they created or own. Only the creator or an admin can delete a task.
