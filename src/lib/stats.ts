@@ -1,5 +1,6 @@
 import { addWeeks, differenceInCalendarDays, format, startOfWeek, subDays, subWeeks } from "date-fns";
 import type { TaskDTO, UserDTO } from "./types";
+import { activeFlag, FLAG_PENALTY } from "./integrity";
 
 export type TaskHealth = "done_on_time" | "done_late" | "overdue" | "due_soon" | "on_track";
 
@@ -65,6 +66,9 @@ export interface UserStats {
   completedLastWeek: number;
   deadlineMoves30: number;
   deadlineMovesTotal: number;
+  /** Active "marked done but wasn't" flags on this person's tasks, last 30 days / ever */
+  flags30: number;
+  flagsTotal: number;
   lastActivityAt: string | null;
   daysSinceActivity: number | null;
   streakWeeks: number;
@@ -172,6 +176,14 @@ export function computeUserStats(userId: string, allTasks: TaskDTO[], now = new 
     }
   }
 
+  let flags30 = 0, flagsTotal = 0;
+  for (const t of mine) {
+    const f = activeFlag(t);
+    if (!f) continue;
+    flagsTotal++;
+    if (new Date(f.createdAt).getTime() >= cutoff30) flags30++;
+  }
+
   const last = lastActivityFor(userId, allTasks);
   const daysSinceActivity = last ? differenceInCalendarDays(now, last) : null;
   const weekly = weekBuckets(mine, 8, now);
@@ -189,6 +201,7 @@ export function computeUserStats(userId: string, allTasks: TaskDTO[], now = new 
         : daysSinceActivity !== null && daysSinceActivity <= 14 ? (ongoing > 0 ? 0.3 : 0.8)
         : ongoing > 0 ? 0 : 0.8;
     score = Math.round(100 * (0.4 * reliability + 0.45 * overdueFactor + 0.15 * activityFactor));
+    score -= FLAG_PENALTY * flags30; // marking work done that wasn't is the opposite of ownership
     score = Math.max(0, Math.min(100, score));
     level = levelForScore(score);
     const idle = ongoing > 0 && (daysSinceActivity === null || daysSinceActivity >= 7);
@@ -198,12 +211,13 @@ export function computeUserStats(userId: string, allTasks: TaskDTO[], now = new 
     }
   }
 
-  const verdict = buildVerdict({ level, ongoing, overdue, dueSoon, doneOnTime30, doneLate30, daysSinceActivity, streakWeeks });
+  let verdict = buildVerdict({ level, ongoing, overdue, dueSoon, doneOnTime30, doneLate30, daysSinceActivity, streakWeeks });
+  if (flags30 > 0) verdict += ` Flagged ${flags30 === 1 ? "once" : `${flags30} times`} this month for marking work done that wasn't.`;
 
   return {
     userId, total: mine.length, ongoing, overdue, dueSoon, onTrack,
     doneOnTime, doneLate, doneOnTime30, doneLate30, onTimeRate, onTimeRate30, avgLateHours,
-    completedThisWeek, completedLastWeek, deadlineMoves30, deadlineMovesTotal,
+    completedThisWeek, completedLastWeek, deadlineMoves30, deadlineMovesTotal, flags30, flagsTotal,
     lastActivityAt: last ? last.toISOString() : null, daysSinceActivity,
     streakWeeks, score, level, verdict, weekly,
   };
@@ -247,6 +261,7 @@ export interface TeamStats {
   doneLate30: number;
   onTimeRate30: number | null;
   deadlineMoves30: number;
+  flags30: number;
   weekly: WeekBucket[];
   workload: { userId: string; onTrack: number; dueSoon: number; overdue: number }[];
   people: UserStats[];
@@ -256,7 +271,7 @@ export function computeTeamStats(users: UserDTO[], tasks: TaskDTO[], now = new D
   const cutoff30 = subDays(now, 30).getTime();
   const thisWeekStart = startOfWeek(now, WEEK_OPTS).getTime();
   const lastWeekStart = subWeeks(thisWeekStart, 1).getTime();
-  let activeTasks = 0, overdueTasks = 0, dueSoonTasks = 0, completedThisWeek = 0, completedLastWeek = 0, doneOnTime30 = 0, doneLate30 = 0, deadlineMoves30 = 0;
+  let activeTasks = 0, overdueTasks = 0, dueSoonTasks = 0, completedThisWeek = 0, completedLastWeek = 0, doneOnTime30 = 0, doneLate30 = 0, deadlineMoves30 = 0, flags30 = 0;
   for (const t of tasks) {
     const h = taskHealth(t, now);
     if (h === "done_on_time" || h === "done_late") {
@@ -270,6 +285,8 @@ export function computeTeamStats(users: UserDTO[], tasks: TaskDTO[], now = new D
       if (h === "due_soon") dueSoonTasks++;
     }
     for (const d of t.deadlineChanges) if (new Date(d.createdAt).getTime() >= cutoff30) deadlineMoves30++;
+    const f = activeFlag(t);
+    if (f && new Date(f.createdAt).getTime() >= cutoff30) flags30++;
   }
   const people = users.map((u) => computeUserStats(u.id, tasks, now));
   const workload = people.map((p) => ({ userId: p.userId, onTrack: p.onTrack, dueSoon: p.dueSoon, overdue: p.overdue }));
@@ -277,7 +294,7 @@ export function computeTeamStats(users: UserDTO[], tasks: TaskDTO[], now = new D
   return {
     activeTasks, overdueTasks, dueSoonTasks, completedThisWeek, completedLastWeek,
     doneOnTime30, doneLate30, onTimeRate30: c30 > 0 ? doneOnTime30 / c30 : null,
-    deadlineMoves30, weekly: weekBuckets(tasks, 12, now), workload, people,
+    deadlineMoves30, flags30, weekly: weekBuckets(tasks, 12, now), workload, people,
   };
 }
 

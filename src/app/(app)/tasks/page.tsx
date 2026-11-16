@@ -13,6 +13,7 @@ import { TaskFilters, type Scope } from "@/components/tasks/TaskFilters";
 import { TaskGroups } from "@/components/tasks/TaskGroups";
 import { KanbanBoard, type KanbanCard } from "@/components/tasks/KanbanBoard";
 import { pendingDeadlineRequest } from "@/lib/approvals";
+import { activeFlag } from "@/lib/integrity";
 
 type SP = Record<string, string | string[] | undefined>;
 const one = (v: string | string[] | undefined): string => (Array.isArray(v) ? v[0] ?? "" : v ?? "");
@@ -72,6 +73,8 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
       deadlineTone: done ? (h === "done_late" ? "done_late" : "done_on_time") : dist.tone,
       owners, subDone: prog.done, subTotal: prog.total, canEdit: canEdit(t),
       pendingDeadline: !!pendingDeadlineRequest(t),
+      dependency: !!t.parentId,
+      flagged: !!activeFlag(t),
     };
   });
 

@@ -55,6 +55,14 @@ export async function listTasksWithPendingRequests(): Promise<TaskDTO[]> {
   return tasks.map(toTaskDTO);
 }
 
+/** Dependencies of a task: the tasks whose parentId points at it. */
+export async function listChildTasks(parentId: string): Promise<TaskDTO[]> {
+  if (!isValidId(parentId)) return [];
+  await connectDB();
+  const tasks = await Task.find({ parentId: new Types.ObjectId(parentId) }).sort({ deadline: 1 }).lean();
+  return tasks.map(toTaskDTO);
+}
+
 export async function getTask(id: string): Promise<TaskDTO | null> {
   if (!isValidId(id)) return null;
   await connectDB();

@@ -36,12 +36,13 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
 
       <PulseCard user={person} stats={stats} isSelf={false} now={now} />
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
         <StatTile label="Open" value={stats.ongoing} tone="accent" hint={`${stats.onTrack} on track`} />
         <StatTile label="Overdue" value={stats.overdue} tone="critical" emphasize={stats.overdue > 0} />
         <StatTile label="Due in 48h" value={stats.dueSoon} tone="warn" />
         <StatTile label="Done on time" value={stats.doneOnTime} tone="good" hint={`${stats.doneOnTime30} this month`} />
         <StatTile label="Done late" value={stats.doneLate} tone="critical" hint={`${stats.doneLate30} this month`} />
+        <StatTile label="Flagged" value={stats.flagsTotal} tone="critical" emphasize={stats.flags30 > 0} hint={stats.flagsTotal > 0 ? `${stats.flags30} this month · marked done but wasn't` : "never"} />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-4">

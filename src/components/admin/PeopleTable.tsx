@@ -21,11 +21,12 @@ export interface PersonRow {
   doneLate: number;
   onTimeRate: number | null;
   moves30: number;
+  flags30: number;
   lastActivityLabel: string;
   lastActivityTs: number;
 }
 
-type Key = keyof Pick<PersonRow, "name" | "score" | "ongoing" | "overdue" | "dueSoon" | "doneOnTime" | "doneLate" | "onTimeRate" | "moves30" | "lastActivityTs">;
+type Key = keyof Pick<PersonRow, "name" | "score" | "ongoing" | "overdue" | "dueSoon" | "doneOnTime" | "doneLate" | "onTimeRate" | "moves30" | "flags30" | "lastActivityTs">;
 
 const COLS: { key: Key; label: string; align?: "right"; title?: string }[] = [
   { key: "name", label: "Person" },
@@ -37,6 +38,7 @@ const COLS: { key: Key; label: string; align?: "right"; title?: string }[] = [
   { key: "doneLate", label: "Late", align: "right", title: "Completed after the deadline" },
   { key: "onTimeRate", label: "On-time %", align: "right" },
   { key: "moves30", label: "Moves 30d", align: "right", title: "Deadline changes made by this person in the last 30 days" },
+  { key: "flags30", label: "Flags 30d", align: "right", title: "Tasks they marked done that a reviewer flagged as not actually done, last 30 days" },
   { key: "lastActivityTs", label: "Last active", align: "right" },
 ];
 
@@ -58,7 +60,7 @@ export function PeopleTable({ rows }: { rows: PersonRow[] }) {
 
   return (
     <div className="card overflow-x-auto scrollbar-thin">
-      <table className="w-full text-sm min-w-[860px]">
+      <table className="w-full text-sm min-w-[940px]">
         <thead>
           <tr className="text-left text-[11px] uppercase tracking-wider text-ink-3 border-b border-line">
             {COLS.map((c) => (
@@ -92,6 +94,7 @@ export function PeopleTable({ rows }: { rows: PersonRow[] }) {
               <td className={`px-3 py-2.5 text-right ${r.doneLate > 0 ? "text-critical-text" : ""}`}>{r.doneLate}</td>
               <td className="px-3 py-2.5 text-right">{r.onTimeRate === null ? "–" : `${Math.round(r.onTimeRate * 100)}%`}</td>
               <td className={`px-3 py-2.5 text-right ${r.moves30 >= 2 ? "text-warn-text font-semibold" : ""}`}>{r.moves30}</td>
+              <td className={`px-3 py-2.5 text-right ${r.flags30 > 0 ? "text-critical-text font-semibold" : ""}`}>{r.flags30}</td>
               <td className="px-3 py-2.5 text-right text-ink-2">{r.lastActivityLabel}</td>
             </tr>
           ))}

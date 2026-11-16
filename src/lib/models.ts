@@ -91,6 +91,16 @@ export interface DeadlineRequestDoc {
   createdAt: Date;
 }
 
+export interface FlagDoc {
+  _id: Types.ObjectId;
+  by: Types.ObjectId;
+  reason: string;
+  createdAt: Date;
+  clearedBy: Types.ObjectId | null;
+  clearedAt: Date | null;
+  clearNote: string;
+}
+
 export interface CommentDoc {
   _id: Types.ObjectId;
   userId: Types.ObjectId;
@@ -115,6 +125,7 @@ export interface TaskDoc {
   deadline: Date;
   originalDeadline: Date;
   createdBy: Types.ObjectId;
+  parentId: Types.ObjectId | null;
   assignees: Types.ObjectId[];
   tags: string[];
   completedAt: Date | null;
@@ -122,6 +133,7 @@ export interface TaskDoc {
   subtasks: SubtaskDoc[];
   deadlineChanges: DeadlineChangeDoc[];
   deadlineRequests: DeadlineRequestDoc[];
+  flags: FlagDoc[];
   comments: CommentDoc[];
   activity: ActivityDoc[];
   createdAt: Date;
@@ -221,6 +233,15 @@ const DeadlineRequestSchema = new Schema<DeadlineRequestDoc>({
   createdAt: { type: Date, default: () => new Date() },
 });
 
+const FlagSchema = new Schema<FlagDoc>({
+  by: { type: Schema.Types.ObjectId, ref: "User", required: true },
+  reason: { type: String, required: true, trim: true },
+  createdAt: { type: Date, default: () => new Date() },
+  clearedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+  clearedAt: { type: Date, default: null },
+  clearNote: { type: String, default: "" },
+});
+
 const CommentSchema = new Schema<CommentDoc>({
   userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
   body: { type: String, required: true, trim: true },
@@ -251,6 +272,7 @@ const TaskSchema = new Schema<TaskDoc>(
     deadline: { type: Date, required: true },
     originalDeadline: { type: Date, required: true },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    parentId: { type: Schema.Types.ObjectId, ref: "Task", default: null },
     assignees: [{ type: Schema.Types.ObjectId, ref: "User" }],
     tags: [{ type: String }],
     completedAt: { type: Date, default: null },
@@ -258,6 +280,7 @@ const TaskSchema = new Schema<TaskDoc>(
     subtasks: [SubtaskSchema],
     deadlineChanges: [DeadlineChangeSchema],
     deadlineRequests: [DeadlineRequestSchema],
+    flags: [FlagSchema],
     comments: [CommentSchema],
     activity: [ActivitySchema],
   },
@@ -267,6 +290,7 @@ TaskSchema.index({ assignees: 1, status: 1 });
 TaskSchema.index({ deadline: 1 });
 TaskSchema.index({ createdBy: 1 });
 TaskSchema.index({ "deadlineRequests.status": 1 });
+TaskSchema.index({ parentId: 1 });
 
 /* ---------- Models (HMR-safe) ---------- */
 

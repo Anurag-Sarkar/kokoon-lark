@@ -4,6 +4,7 @@ import { taskHealth } from "@/lib/stats";
 import { deadlineDistance, fmtDateTime, latenessLabel } from "@/lib/format";
 import { subtaskProgress } from "@/lib/taskViews";
 import { pendingDeadlineRequest } from "@/lib/approvals";
+import { activeFlag } from "@/lib/integrity";
 import type { TaskDTO, UserDTO } from "@/lib/types";
 import { OwnerList } from "@/components/ui/Avatar";
 import { HealthPill, PriorityMark, StatusPill, Tag } from "@/components/ui/Pills";
@@ -25,6 +26,8 @@ export function TaskRow({ task, users, now, showOwners = true }: { task: TaskDTO
           <span className={h === "overdue" ? "text-critical-text font-semibold" : h === "due_soon" ? "text-warn-text font-semibold" : ""}>{deadlineText}</span>
           {task.deadlineChanges.length > 0 && <span>· moved {task.deadlineChanges.length}×</span>}
           {pendingDeadlineRequest(task) && <span className="text-accent-deep font-semibold">· change pending approval</span>}
+          {task.parentId && <span>· dependency</span>}
+          {activeFlag(task) && <span className="text-critical-text font-semibold">· flagged</span>}
           {task.tags.slice(0, 3).map((t) => <Tag key={t}>{t}</Tag>)}
           {showOwners && <span className="sm:hidden basis-full text-ink-2">{owners.length ? owners.map((u) => u.name).join(", ") : "Unassigned"}</span>}
         </div>

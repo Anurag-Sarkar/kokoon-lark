@@ -27,7 +27,7 @@ export default async function AdminPage() {
     return {
       id: u.id, name: u.name, color: u.color, title: u.title || (u.role === "admin" ? "Admin" : "Member"),
       level: p.level, score: p.score, ongoing: p.ongoing, overdue: p.overdue, dueSoon: p.dueSoon,
-      doneOnTime: p.doneOnTime, doneLate: p.doneLate, onTimeRate: p.onTimeRate, moves30: p.deadlineMoves30,
+      doneOnTime: p.doneOnTime, doneLate: p.doneLate, onTimeRate: p.onTimeRate, moves30: p.deadlineMoves30, flags30: p.flags30,
       lastActivityLabel: p.lastActivityAt ? timeAgo(p.lastActivityAt, now) : "never",
       lastActivityTs: p.lastActivityAt ? new Date(p.lastActivityAt).getTime() : 0,
     };

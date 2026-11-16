@@ -22,6 +22,10 @@ export interface KanbanCard {
   canEdit: boolean;
   /** a deadline change is waiting for approval */
   pendingDeadline: boolean;
+  /** this task feeds another task */
+  dependency: boolean;
+  /** marked done but a reviewer flagged it as not done */
+  flagged: boolean;
 }
 
 const TONE: Record<KanbanCard["deadlineTone"], string> = {
@@ -82,6 +86,8 @@ export function KanbanBoard({ cards: initial, columns = STATUSES, doneLabel }: {
                         <Link href={`/tasks/${c.id}`} className="text-sm font-medium leading-snug hover:underline block">{c.title}</Link>
                         <div className={`mt-1 text-[11px] font-medium ${TONE[c.deadlineTone]}`}>{c.deadlineLabel}</div>
                         {c.pendingDeadline && <div className="mt-0.5 text-[11px] font-semibold text-accent-deep">Deadline change pending approval</div>}
+                        {c.flagged && <div className="mt-0.5 text-[11px] font-semibold text-critical-text">Flagged: marked done but wasn't</div>}
+                        {c.dependency && <div className="mt-0.5 text-[11px] text-ink-3">Dependency for another task</div>}
                       </div>
                       <PriorityMark priority={c.priority} />
                     </div>

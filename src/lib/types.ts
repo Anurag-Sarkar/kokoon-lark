@@ -83,6 +83,17 @@ export interface DeadlineRequestDTO {
   createdAt: string;
 }
 
+/** A reviewer's mark that the task was set to done without the work actually being done. Active while clearedAt is null. */
+export interface FlagDTO {
+  id: string;
+  by: string;
+  reason: string;
+  createdAt: string;
+  clearedBy: string | null;
+  clearedAt: string | null;
+  clearNote: string;
+}
+
 export interface CommentDTO {
   id: string;
   userId: string;
@@ -100,6 +111,9 @@ export type ActivityType =
   | "deadline_approved"
   | "deadline_rejected"
   | "deadline_withdrawn"
+  | "dependency_added"
+  | "flagged"
+  | "flag_cleared"
   | "assignees"
   | "edited"
   | "subtask_added"
@@ -125,6 +139,8 @@ export interface TaskDTO {
   deadline: string;
   originalDeadline: string;
   createdBy: string;
+  /** Set when this task is a dependency of another task */
+  parentId: string | null;
   assignees: string[];
   tags: string[];
   completedAt: string | null;
@@ -132,6 +148,7 @@ export interface TaskDTO {
   subtasks: SubtaskDTO[];
   deadlineChanges: DeadlineChangeDTO[];
   deadlineRequests: DeadlineRequestDTO[];
+  flags: FlagDTO[];
   comments: CommentDTO[];
   activity: ActivityDTO[];
   createdAt: string;

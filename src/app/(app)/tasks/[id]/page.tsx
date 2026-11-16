@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, CalendarClock, History, Hourglass, MessageSquare, ListChecks } from "lucide-react";
+import { ArrowLeft, CalendarClock, GitBranch, History, Hourglass, MessageSquare, ListChecks, ShieldAlert } from "lucide-react";
 import { requireUser } from "@/lib/auth";
-import { getTask, listTeams, listUsers, userMap } from "@/lib/queries";
+import { getTask, listChildTasks, listTeams, listUsers, userMap } from "@/lib/queries";
+import { activeFlag, canFlag } from "@/lib/integrity";
+import { AddDependencyButton, ClearFlagButton, FlagButton } from "@/components/tasks/Dependencies";
+import { OwnerList } from "@/components/ui/Avatar";
 import { taskHealth } from "@/lib/stats";
 import { canReview, changesApplyDirectly, pendingDeadlineRequest, reviewerLabel, reviewersFor } from "@/lib/approvals";
 import { ReviewButtons } from "@/components/approvals/ReviewButtons";
@@ -17,6 +20,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   const user = await requireUser();
   const [task, users, teams] = await Promise.all([getTask(id), listUsers({ includeInactive: true }), listTeams()]);
   if (!task) notFound();
+  const [children, parent] = await Promise.all([listChildTasks(task.id), task.parentId ? getTask(task.parentId) : Promise.resolve(null)]);
   const now = new Date();
   const umap = userMap(users);
   const canEdit = user.role === "admin" || task.createdBy === user.id || task.assignees.includes(user.id);
@@ -36,6 +40,10 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   const canDecide = pending ? canReview(user, pending.requestedBy, teams) : false;
   const canWithdraw = pending ? pending.requestedBy === user.id || user.role === "admin" : false;
   const waitingOn = pending ? reviewerLabel(reviewersFor(pending.requestedBy, users, teams)) : "";
+  const flag = activeFlag(task);
+  const flagger = flag ? umap.get(flag.by) ?? null : null;
+  const mayFlag = canFlag(user, task, teams);
+  const openChildren = children.filter((c) => c.status !== "done").length;
 
   return (
     <div className="grid grid-cols-1 gap-5">
@@ -56,6 +64,8 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
                   {isDone ? <HealthPill health={h} /> : h !== "on_track" && <HealthPill health={h} label={dist.label} />}
                   {moved && <span className="pill bg-warn-soft text-warn-text"><CalendarClock className="size-3.5" />Deadline moved {task.deadlineChanges.length}×</span>}
                   {pending && <span className="pill bg-accent-soft text-accent-deep"><Hourglass className="size-3.5" />Deadline change pending</span>}
+                  {flag && <span className="pill bg-critical-soft text-critical-text"><ShieldAlert className="size-3.5" />Flagged: marked done but wasn't</span>}
+                  {parent && <Link href={`/tasks/${parent.id}`} className="pill bg-surface-2 text-ink-2 border border-line hover:border-line-2"><GitBranch className="size-3.5" />Dependency of: {parent.title}</Link>}
                 </div>
                 <h1 className="text-2xl font-semibold tracking-tight leading-tight">{task.title}</h1>
                 {task.description ? <p className="mt-3 text-sm text-ink-2 leading-relaxed whitespace-pre-wrap">{task.description}</p> : <p className="mt-3 text-sm text-ink-3 italic">No description.</p>}
@@ -67,6 +77,40 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           <section className="card p-5 sm:p-6">
             <h2 className="flex items-center gap-2 text-sm font-semibold mb-3"><ListChecks className="size-4 text-ink-3" />Subtasks</h2>
             <SubtaskList task={task} subtasks={task.subtasks} users={users} canEdit={canEdit} />
+          </section>
+
+          <section className="card p-5 sm:p-6">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <h2 className="flex items-center gap-2 text-sm font-semibold"><GitBranch className="size-4 text-ink-3" />Dependencies {children.length > 0 && <span className="text-ink-3 font-normal tnum">{children.length - openChildren}/{children.length} done</span>}</h2>
+              {canEdit && !isDone && <AddDependencyButton parent={task} users={activeUsers} currentUserId={user.id} />}
+            </div>
+            {children.length === 0 ? (
+              <p className="text-xs text-ink-3">Nothing from other people is needed for this task. If it depends on someone else's work, add it here: they get it as a task of their own, with its own deadline.</p>
+            ) : (
+              <ul className="grid gap-1">
+                {children.map((c) => {
+                  const ch = taskHealth(c, now);
+                  const cd = deadlineDistance(c.deadline, now);
+                  const cOwners = c.assignees.map((a) => umap.get(a)).filter((u): u is UserDTO => !!u);
+                  const cFlag = activeFlag(c);
+                  return (
+                    <li key={c.id}>
+                      <Link href={`/tasks/${c.id}`} className="row-link grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-1 rounded-lg px-3 py-2 border border-line hover:border-line-2">
+                        <span className="min-w-0">
+                          <span className={`block text-sm font-medium truncate ${c.status === "done" ? "text-ink-2" : ""}`}>{c.title}</span>
+                          <span className={`block text-[11px] ${ch === "overdue" ? "text-critical-text font-semibold" : ch === "due_soon" ? "text-warn-text font-semibold" : "text-ink-3"}`}>
+                            {c.status === "done" && c.completedAt ? `Done · ${latenessLabel(c.deadline, c.completedAt)}` : `${fmtDateTime(c.deadline, now)} · ${cd.label}`}
+                            {cFlag ? " · flagged" : ""}
+                          </span>
+                        </span>
+                        <span className="hidden sm:flex justify-end max-w-[220px]"><OwnerList users={cOwners} size="xs" className="justify-end" /></span>
+                        <span className="justify-self-end">{c.status === "done" ? <HealthPill health={ch} /> : ch === "on_track" ? <StatusPill status={c.status} /> : <HealthPill health={ch} label={cd.label} />}</span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </section>
 
           <section className="card p-5 sm:p-6">
@@ -95,6 +139,16 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           <section className="card p-4 grid gap-3">
             <div className="text-xs font-semibold text-ink-3 uppercase tracking-wider">Status</div>
             <StatusControl task={task} canEdit={canEdit} />
+            {!isDone && openChildren > 0 && <p className="text-[11px] text-warn-text font-semibold">{openChildren} {openChildren === 1 ? "dependency is" : "dependencies are"} still open.</p>}
+            {flag && (
+              <div className="rounded-xl border border-critical/40 bg-critical-soft p-3 grid gap-1.5 text-xs">
+                <div className="flex items-center gap-1.5 font-semibold text-critical-text"><ShieldAlert className="size-3.5" />Flagged by {flagger?.name ?? "a reviewer"} · {timeAgo(flag.createdAt, now)}</div>
+                <div className="text-ink-2">Marked done, but the work wasn't done. Reopened, and it counts against the owners' score until cleared.</div>
+                <div className="rounded-md bg-surface px-2 py-1 text-ink-2">“{flag.reason}”</div>
+                {mayFlag && <div className="pt-1"><ClearFlagButton taskId={task.id} flagId={flag.id} /></div>}
+              </div>
+            )}
+            {isDone && !flag && mayFlag && <FlagButton taskId={task.id} />}
             {isDone && task.completedAt && (
               <p className="text-xs text-ink-2">Completed {fmtDateTime(task.completedAt, now)}{task.completedBy && umap.get(task.completedBy) ? ` by ${umap.get(task.completedBy)!.name}` : ""} · <span className={h === "done_late" ? "text-critical-text font-semibold" : "text-good-text font-semibold"}>{latenessLabel(task.deadline, task.completedAt)}</span></p>
             )}
@@ -159,7 +213,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
             <ol className="grid gap-3 max-h-[420px] overflow-auto scrollbar-thin pr-1">
               {timeline.map((a) => {
                 const u = umap.get(a.userId);
-                const tone = a.type === "deadline_approved" ? "bg-good" : a.type === "deadline_rejected" ? "bg-critical" : a.type.startsWith("deadline") ? "bg-warn" : a.type === "completed" ? "bg-good" : a.type === "reopened" ? "bg-critical" : "bg-line-2";
+                const tone = a.type === "deadline_approved" || a.type === "flag_cleared" ? "bg-good" : a.type === "deadline_rejected" || a.type === "flagged" ? "bg-critical" : a.type.startsWith("deadline") ? "bg-warn" : a.type === "completed" ? "bg-good" : a.type === "reopened" ? "bg-critical" : "bg-line-2";
                 return (
                   <li key={a.id} className="relative pl-5 text-xs">
                     <span className={`absolute left-0 top-1.5 size-2.5 rounded-full ${tone}`} aria-hidden />

@@ -36,6 +36,7 @@ Production: `npm run build && npm start`. Set `MONGODB_URI` (and the email varia
 - List view grouped by Overdue / Due today / This week / Later / Completed, plus a drag-and-drop board.
 - Owners are always shown by full name, never just initials.
 - Completed tasks stay out of the way: the board and list hide them until you turn on **Completed**, and then show only the current week. Admins can switch to a single day and step back through earlier days or weeks.
+- The new-task form keeps what you typed if something is missing, and the Create button only enables once there is a title, a deadline and at least one owner.
 - Search and filters by status, priority and owner. Scope is **My tasks** / **My team** for members and **My tasks** / **Team** / **Everyone** for admins.
 
 **Teams**
@@ -43,6 +44,13 @@ Production: `npm run build && npm start`. Set `MONGODB_URI` (and the email varia
 - The hierarchy is admin → team owner → team member. The owner reviews deadline changes their members ask for; an admin can also be a team member or owner.
 - Members see their team's work on the task list and board, and their Team pulse compares them with their teammates rather than the whole company. Someone in no team sees only their own tasks.
 - The admin overview ranks every team by a team ownership score (the average of its members' scores) with open, overdue, done-this-week and on-time figures; clicking a team opens its own overview with people table, charts and overdue list.
+
+**Dependencies**
+- A task can depend on work from other people. From the task page, *Add dependency* creates a real task for them with its own deadline (on or before the parent's), linked back to the task it feeds. It shows up in their list, board and dashboard like any task and counts in their ownership score the same way, so a late dependency costs its owner, not the person waiting on it.
+- The parent shows its dependencies with status and health, and a "still open" warning next to Mark done. Deleting a parent leaves its dependencies as ordinary tasks.
+
+**Integrity flags**
+- If someone marks a task done without the work being done, an admin or the owner's team owner can *Flag as not actually done* with a reason. The task is reopened, the owners are notified, and each active flag in the last 30 days takes 15 points off their ownership score (shown in the people table and on their page). Reviewers can clear a flag with a note once the work is real; a task's owners can never flag or clear their own.
 
 **Deadlines**
 - Changing a deadline requires a written reason. Old date, new date, who, why, who approved, and when are stored on the task and shown in the task's deadline history.
@@ -155,6 +163,7 @@ src/app/{signup,forgot-password,reset-password,invite}   public auth pages
 src/lib/models.ts              Mongoose schemas (User, Session, Team, Task with embedded subtasks/comments/changes/activity)
 src/lib/actions.ts             task, people and team mutations (server actions) with permission checks
 src/lib/approvals.ts           who may move a deadline directly, who must ask, and who decides
+src/lib/integrity.ts           dependencies and "marked done but wasn't" flags, with the score penalty
 src/lib/signupPolicy.ts        self sign-up rules from env (allowed domains, disabled)
 src/lib/push.ts, pushActions.ts  Web Push sending and per-device subscriptions
 src/app/(app)/approvals        deadline requests waiting for the signed-in reviewer, and their own

@@ -2,7 +2,7 @@ import { Types } from "mongoose";
 import { connectDB } from "./mongodb";
 import { User, type TaskDoc } from "./models";
 import { appUrl, sendMail } from "./mail";
-import { assignedEmail, deadlineDecisionEmail, deadlineRequestEmail } from "./emails";
+import { assignedEmail, deadlineDecisionEmail, deadlineRequestEmail, flaggedEmail } from "./emails";
 import { fmtShortDateTime, shiftLabel } from "./format";
 import { PRIORITY_LABEL } from "./types";
 import { sendPush } from "./push";
@@ -132,5 +132,24 @@ export async function notifyDeadlineDecision(
     });
   } catch (err) {
     console.error("[notify] deadline decision email failed:", err);
+  }
+}
+
+/** Tells a task's owners it was flagged as "marked done but not done" and reopened. Never throws. */
+export async function notifyFlagged(task: Pick<TaskDoc, "_id" | "title">, ownerIds: string[], actor: { id: string; name: string }, reason: string): Promise<void> {
+  const path = `/tasks/${task._id.toString()}`;
+  await sendPush(ownerIds.filter((id) => id !== actor.id), {
+    title: `${actor.name} flagged a task you marked done`,
+    body: `${task.title} was reopened. ${reason}`,
+    url: path,
+    tag: `flag-${task._id.toString()}`,
+  });
+  try {
+    const users = await mailableUsers(ownerIds, actor.id);
+    if (users.length === 0) return;
+    const link = `${await appUrl()}${path}`;
+    await Promise.allSettled(users.map((u) => sendMail({ to: u.email, ...flaggedEmail({ name: u.name, byName: actor.name, taskTitle: task.title, reason, link }) })));
+  } catch (err) {
+    console.error("[notify] flag emails failed:", err);
   }
 }

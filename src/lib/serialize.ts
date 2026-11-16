@@ -42,6 +42,7 @@ export function toTaskDTO(t: TaskDoc): TaskDTO {
     deadline: isoReq(t.deadline),
     originalDeadline: isoReq(t.originalDeadline ?? t.deadline),
     createdBy: t.createdBy.toString(),
+    parentId: t.parentId ? t.parentId.toString() : null,
     assignees: (t.assignees ?? []).map((a) => a.toString()),
     tags: t.tags ?? [],
     completedAt: iso(t.completedAt),
@@ -74,6 +75,15 @@ export function toTaskDTO(t: TaskDoc): TaskDTO {
       reviewedAt: iso(r.reviewedAt),
       note: r.note ?? "",
       createdAt: isoReq(r.createdAt),
+    })),
+    flags: (t.flags ?? []).map((f) => ({
+      id: f._id.toString(),
+      by: f.by.toString(),
+      reason: f.reason,
+      createdAt: isoReq(f.createdAt),
+      clearedBy: f.clearedBy ? f.clearedBy.toString() : null,
+      clearedAt: iso(f.clearedAt),
+      clearNote: f.clearNote ?? "",
     })),
     comments: (t.comments ?? []).map((c) => ({
       id: c._id.toString(),

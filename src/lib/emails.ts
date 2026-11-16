@@ -131,3 +131,21 @@ export function deadlineDecisionEmail(p: { name: string; reviewerName: string; t
     ),
   };
 }
+
+export function flaggedEmail(p: { name: string; byName: string; taskTitle: string; reason: string; link: string }): MailContent {
+  const first = p.name.split(" ")[0];
+  return {
+    subject: `Flagged: ${p.taskTitle} was marked done but isn't`,
+    text: `Hi ${first},\n\n${p.byName} flagged "${p.taskTitle}" as marked done without the work being done, and reopened it.\n\nReason: ${p.reason}\n\nThis counts against your ownership score until the flag is cleared. Finish the task properly, then talk to ${p.byName} if you think this is wrong.\n\nOpen the task: ${p.link}`,
+    html: layout(
+      `${esc(p.byName)} flagged a task you marked done`,
+      [
+        `Hi ${esc(first)},`,
+        `<strong>${esc(p.taskTitle)}</strong> was marked done, but ${esc(p.byName)} says the work isn't done. It has been reopened.`,
+        `<span style="display:block;background:#f6f6f3;border-radius:10px;padding:12px 14px;font-size:14px"><span style="color:#7a7a76">Reason:</span> ${esc(p.reason)}</span>`,
+        `This counts against your ownership score until the flag is cleared. Finish the task properly, then talk to ${esc(p.byName)} if you think this is wrong.`,
+      ],
+      { href: p.link, label: "Open the task" }
+    ),
+  };
+}

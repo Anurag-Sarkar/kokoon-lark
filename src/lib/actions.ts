@@ -9,9 +9,10 @@ import { SESSION_COOKIE, destroySession, getCurrentUser, startSession } from "./
 import { INVITE_TTL_MS, issueToken } from "./tokens";
 import { appUrl, mailConfigured, sendMail } from "./mail";
 import { inviteEmail, tempPasswordEmail } from "./emails";
-import { notifyAssigned, notifyDeadlineDecision, notifyDeadlineRequest } from "./notify";
+import { notifyAssigned, notifyDeadlineDecision, notifyDeadlineRequest, notifyFlagged } from "./notify";
 import { toTeamDTO, toUserDTO } from "./serialize";
 import { canReview, changesApplyDirectly, reviewerLabel, reviewersFor } from "./approvals";
+import { canFlag } from "./integrity";
 import { AVATAR_COLORS } from "./palette";
 import { connectDB } from "./mongodb";
 import { Task, Team, User, type TaskDoc } from "./models";
@@ -423,8 +424,119 @@ export async function deleteTask(taskId: string): Promise<ActionResult> {
   if (!task) return fail("Task not found.");
   if (user.role !== "admin" && task.createdBy.toString() !== user.id) return fail("Only the creator or an admin can delete a task.");
   await Task.deleteOne({ _id: task._id });
+  await Task.updateMany({ parentId: task._id }, { $set: { parentId: null } }); // dependencies live on as ordinary tasks
   revalidateAll();
   redirect("/tasks");
+}
+
+/* ---------------- dependencies ---------------- */
+
+export type CreateResult = { ok: true; id: string } | { ok: false; error: string };
+
+/**
+ * Adds a dependency: a real task, owned by other people with its own deadline, that feeds this one.
+ * It shows up for its owners like any other task and counts in their ownership score the same way.
+ */
+export async function createDependency(
+  parentId: string,
+  input: { title: string; description: string; deadline: string; assigneeIds: string[] }
+): Promise<CreateResult> {
+  const user = await requireActor();
+  const parent = await loadEditableTask(parentId, user);
+  if (typeof parent === "string") return { ok: false, error: parent };
+  if (parent.status === "done") return { ok: false, error: "This task is already done, so it can't take new dependencies." };
+  const title = input.title.trim();
+  if (title.length < 2) return { ok: false, error: "Give the dependency a title." };
+  if (title.length > 200) return { ok: false, error: "Title is too long (200 characters max)." };
+  const deadline = parseDeadline(input.deadline);
+  if (!deadline) return { ok: false, error: "Pick a deadline for it." };
+  if (deadline.getTime() > new Date(parent.deadline).getTime()) {
+    return { ok: false, error: `A dependency has to land before the task it feeds. Pick a time on or before ${fmtShortDateTime(new Date(parent.deadline).toISOString())}.` };
+  }
+  const ids = [...new Set(input.assigneeIds.filter(isValidId))];
+  if (ids.length === 0) return { ok: false, error: "Pick at least one person to own it." };
+  const owners = await User.find({ _id: { $in: ids }, active: { $ne: false } }).select("name").lean();
+  if (owners.length !== ids.length) return { ok: false, error: "One of those people isn't available." };
+  const names = owners.map((u) => u.name);
+
+  const created = await Task.create({
+    title,
+    description: input.description.trim(),
+    priority: parent.priority,
+    status: "todo",
+    deadline,
+    originalDeadline: deadline,
+    createdBy: oid(user.id),
+    parentId: parent._id,
+    assignees: ids.map(oid),
+    tags: [],
+    activity: [activity(user.id, "created", `Created this as a dependency of "${parent.title}" and assigned it to ${names.join(", ")}. Deadline ${fmtShortDateTime(deadline.toISOString())}.`)],
+  });
+  await Task.updateOne(
+    { _id: parent._id },
+    { $push: { activity: activity(user.id, "dependency_added", `Added dependency "${title}" for ${names.join(", ")}, due ${fmtShortDateTime(deadline.toISOString())}.`) } }
+  );
+  await notifyAssigned(created, ids, user, names);
+  revalidateAll();
+  return { ok: true, id: created._id.toString() };
+}
+
+/* ---------------- integrity flags ---------------- */
+
+/**
+ * Admin or the owner's team owner says a task was marked done without the work being done.
+ * The task is reopened, the flag is logged, and it costs the owners score until it's cleared.
+ */
+export async function flagTask(taskId: string, reason: string): Promise<ActionResult> {
+  const user = await requireActor();
+  if (!isValidId(taskId)) return fail("Task not found.");
+  const trimmed = reason.trim();
+  if (trimmed.length < 5) return fail("Say what's missing (at least 5 characters). The owner will see it.");
+  await connectDB();
+  const task = await Task.findById(taskId).lean();
+  if (!task) return fail("Task not found.");
+  if (task.status !== "done") return fail("Only a task that's marked done can be flagged.");
+  if ((task.flags ?? []).some((f) => !f.clearedAt)) return fail("This task is already flagged.");
+  const teams = (await Team.find({}).lean()).map(toTeamDTO);
+  const assigneeIds = task.assignees.map((a) => a.toString());
+  if (!canFlag(user, { assignees: assigneeIds }, teams)) return fail("Only an admin or the owner's team owner can flag this, and never on their own task.");
+
+  await Task.updateOne(
+    { _id: task._id },
+    {
+      $set: { status: "in_progress", completedAt: null, completedBy: null },
+      $push: {
+        flags: { by: oid(user.id), reason: trimmed },
+        activity: activity(user.id, "flagged", `Flagged this as marked done without the work being done, and reopened it. Reason: ${trimmed}`),
+      },
+    }
+  );
+  await notifyFlagged(task, assigneeIds, user, trimmed);
+  revalidateAll();
+  return { ok: true };
+}
+
+/** Lifts a flag (admin or team owner), e.g. once the work really is done or the flag was a mistake. */
+export async function clearFlag(taskId: string, flagId: string, note = ""): Promise<ActionResult> {
+  const user = await requireActor();
+  if (!isValidId(taskId) || !isValidId(flagId)) return fail("Flag not found.");
+  await connectDB();
+  const task = await Task.findById(taskId).lean();
+  if (!task) return fail("Task not found.");
+  const flag = (task.flags ?? []).find((f) => f._id.toString() === flagId);
+  if (!flag || flag.clearedAt) return fail("That flag is already cleared.");
+  const teams = (await Team.find({}).lean()).map(toTeamDTO);
+  if (!canFlag(user, { assignees: task.assignees.map((a) => a.toString()) }, teams)) return fail("Only an admin or the owner's team owner can clear this.");
+  const cleanNote = note.trim().slice(0, 300);
+  await Task.updateOne(
+    { _id: task._id, "flags._id": flag._id },
+    {
+      $set: { "flags.$.clearedBy": oid(user.id), "flags.$.clearedAt": new Date(), "flags.$.clearNote": cleanNote },
+      $push: { activity: activity(user.id, "flag_cleared", `Cleared the flag.${cleanNote ? ` Note: ${cleanNote}` : ""}`) },
+    }
+  );
+  revalidateAll();
+  return { ok: true };
 }
 
 /* ---------------- admin: people ---------------- */
