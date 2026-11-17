@@ -4,9 +4,9 @@ import type { TaskDTO, UserDTO } from "@/lib/types";
 import { TaskRow } from "./TaskRow";
 import { EmptyState } from "@/components/shell/PageHeader";
 
-export function TaskGroups({ tasks, users, now, showOwners = true, collapseDone = true, doneHint }: { tasks: TaskDTO[]; users: Map<string, UserDTO>; now: Date; showOwners?: boolean; collapseDone?: boolean; doneHint?: string }) {
+export function TaskGroups({ tasks, users, now, showOwners = true, collapseDone = true, doneHint, titles, empty }: { tasks: TaskDTO[]; users: Map<string, UserDTO>; now: Date; showOwners?: boolean; collapseDone?: boolean; doneHint?: string; /** task id → title, so a dependency row can say which task it feeds */ titles?: Map<string, string>; empty?: { title: string; body?: string } }) {
   const groups = groupTasks(tasks, now).filter((g) => g.tasks.length > 0);
-  if (groups.length === 0) return <EmptyState title="No tasks match" body="Try clearing a filter, or create a new task." />;
+  if (groups.length === 0) return <EmptyState title={empty?.title ?? "No tasks match"} body={empty ? empty.body : "Try clearing a filter, or create a new task."} />;
   return (
     <div className="grid gap-4">
       {groups.map((g) => {
@@ -14,7 +14,7 @@ export function TaskGroups({ tasks, users, now, showOwners = true, collapseDone 
         const hint = g.key === "done" && doneHint ? doneHint : g.hint;
         const list = (
           <div className="card overflow-hidden">
-            {g.tasks.map((t) => <TaskRow key={t.id} task={t} users={users} now={now} showOwners={showOwners} />)}
+            {g.tasks.map((t) => <TaskRow key={t.id} task={t} users={users} now={now} showOwners={showOwners} parentTitle={t.parentId ? titles?.get(t.parentId) : undefined} />)}
           </div>
         );
         if (g.key === "done" && collapseDone) {

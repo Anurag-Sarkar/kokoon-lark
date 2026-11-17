@@ -35,7 +35,8 @@ Production: `npm run build && npm start`. Set `MONGODB_URI` (and the email varia
 - Subtasks with a progress bar, comments, and a full activity timeline.
 - List view grouped by Overdue / Due today / This week / Later / Completed, plus a drag-and-drop board.
 - Owners are always shown by full name, never just initials.
-- Completed tasks stay out of the way: the board and list hide them until you turn on **Completed**, and then show only the current week. Admins can switch to a single day and step back through earlier days or weeks.
+- Completed tasks stay out of the way: the board and list hide them until you turn on **Completed**, and then show only the current week. Admins can switch to a single day and step back through earlier days or weeks. When the current view is hiding finished tasks, a line under it says how many and offers *Show completed*.
+- Feels instant on a slow connection: every page has a skeleton that appears the moment you tap a link, sidebar items, rows and cards show a spinner while they load, and the filter bar shows one while results update.
 - The new-task form keeps what you typed if something is missing, and the Create button only enables once there is a title, a deadline and at least one owner.
 - Search and filters by status, priority and owner. Scope is **My tasks** / **My team** for members and **My tasks** / **Team** / **Everyone** for admins.
 
@@ -45,9 +46,12 @@ Production: `npm run build && npm start`. Set `MONGODB_URI` (and the email varia
 - Members see their team's work on the task list and board, and their Team pulse compares them with their teammates rather than the whole company. Someone in no team sees only their own tasks.
 - The admin overview ranks every team by a team ownership score (the average of its members' scores) with open, overdue, done-this-week and on-time figures; clicking a team opens its own overview with people table, charts and overdue list.
 
+**People**
+- Every name and avatar in the app links to that person's page (`/people/<id>`): their score, open and overdue counts, what needs their attention and their tasks. Admins see the full picture (plus flags and deadline changes); members see it for themselves and their teammates, the same people as on their Team pulse, and for anyone else only the work they share.
+
 **Dependencies**
 - A task can depend on work from other people. From the task page, *Add dependency* creates a real task for them with its own deadline (on or before the parent's), linked back to the task it feeds. It shows up in their list, board and dashboard like any task and counts in their ownership score the same way, so a late dependency costs its owner, not the person waiting on it.
-- The parent shows its dependencies with status and health, and a "still open" warning next to Mark done. Deleting a parent leaves its dependencies as ordinary tasks.
+- The parent shows its dependencies with status and health, and a "still open" warning next to Mark done. In lists and on the board, a dependency says which task it feeds. Deleting a parent leaves its dependencies as ordinary tasks.
 - Deadlines stay consistent: a dependency can't be moved past the task it feeds, and a task can't be pulled in before an open dependency. Both are checked when a change is made or requested, and again when a request is approved.
 
 **Integrity flags**
@@ -161,6 +165,9 @@ src/app/(app)/dashboard        personal dashboard
 src/app/(app)/tasks            list + board, new task, task detail
 src/app/(app)/admin            team overview, teams + team detail, people, person detail, deadline log
 src/app/(app)/account          change password, email notifications
+src/app/(app)/people/[id]      a person's page; every name and avatar links here
+src/app/(app)/**/loading.tsx   per-route skeletons shown while a page loads
+src/components/ui/Skeleton.tsx, LinkPending.tsx   skeleton blocks and the in-link spinner
 src/app/{signup,forgot-password,reset-password,invite}   public auth pages
 src/lib/models.ts              Mongoose schemas (User, Session, Team, Task with embedded subtasks/comments/changes/activity)
 src/lib/actions.ts             task, people and team mutations (server actions) with permission checks

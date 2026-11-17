@@ -4,6 +4,7 @@ import { taskHealth } from "@/lib/stats";
 import { deadlineDistance, fmtDateTime } from "@/lib/format";
 import type { TaskDTO, UserDTO } from "@/lib/types";
 import { OwnerList } from "@/components/ui/Avatar";
+import { LinkSpinner } from "@/components/ui/LinkPending";
 import { HealthPill, PriorityMark } from "@/components/ui/Pills";
 import { EmptyState } from "@/components/shell/PageHeader";
 
@@ -30,17 +31,18 @@ export function AttentionList({ tasks, users, now, title = "Needs your attention
             const d = deadlineDistance(t.deadline, now);
             const owners = t.assignees.map((id) => users.get(id)).filter((u): u is UserDTO => !!u);
             return (
-              <li key={t.id}>
-                <Link href={`/tasks/${t.id}`} className="row-link flex items-center gap-3 px-2 py-2.5 rounded-lg">
-                  <PriorityMark priority={t.priority} />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium line-clamp-2 leading-snug">{t.title}</div>
-                    <div className="text-[11px] text-ink-3">{fmtDateTime(t.deadline, now)}</div>
-                  </div>
-                  <OwnerList users={owners} size="xs" className="hidden sm:inline-flex max-w-[220px] justify-end" />
-                  <HealthPill health={h} label={d.label} />
-                  <ArrowRight className="size-3.5 text-ink-3 shrink-0" />
+              <li key={t.id} className="row-link relative flex items-center gap-3 px-2 py-2.5 rounded-lg">
+                <Link href={`/tasks/${t.id}`} className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-accent" aria-label={t.title}>
+                  <LinkSpinner className="absolute right-7 top-1/2 -translate-y-1/2 rounded-full bg-surface" />
                 </Link>
+                <PriorityMark priority={t.priority} />
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium line-clamp-2 leading-snug">{t.title}</div>
+                  <div className="text-[11px] text-ink-3">{fmtDateTime(t.deadline, now)}</div>
+                </div>
+                <OwnerList users={owners} size="xs" className="hidden sm:inline-flex max-w-[220px] justify-end" />
+                <HealthPill health={h} label={d.label} />
+                <ArrowRight className="size-3.5 text-ink-3 shrink-0" />
               </li>
             );
           })}

@@ -24,6 +24,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const now = new Date();
   const [users, all, teams] = await Promise.all([listUsers(), listAllTasks(), listTeams()]);
   const umap = userMap(users);
+  const titles = new Map(all.map((t) => [t.id, t.title]));
   const isAdmin = user.role === "admin";
 
   // Members never see "everyone": their widest view is their own team(s).
@@ -54,6 +55,11 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   else if (STATUSES.includes(status as Status)) tasks = tasks.filter((t) => t.status === status);
   if (PRIORITIES.includes(priority as Priority)) tasks = tasks.filter((t) => t.priority === priority);
   if (assignee) tasks = tasks.filter((t) => t.assignees.includes(assignee));
+  // Say how many finished tasks the view is hiding, with a one-click way to see them.
+  const hiddenDone = showDone ? 0 : tasks.filter((t) => t.status === "done").length;
+  const showDoneParams = new URLSearchParams();
+  for (const [k, v] of Object.entries(sp)) { const s = one(v); if (s) showDoneParams.set(k, s); }
+  showDoneParams.set("done", "1");
   tasks = tasks.filter((t) => t.status !== "done" || (showDone && inPeriod(t.completedAt ?? t.updatedAt, period)));
 
   const open = tasks.filter((t) => t.status !== "done").length;
@@ -64,7 +70,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const cards: KanbanCard[] = tasks.map((t) => {
     const h = taskHealth(t, now);
     const prog = subtaskProgress(t);
-    const owners = t.assignees.map((id) => umap.get(id)).filter((u): u is UserDTO => !!u).map((u) => ({ name: u.name, color: u.color }));
+    const owners = t.assignees.map((id) => umap.get(id)).filter((u): u is UserDTO => !!u).map((u) => ({ id: u.id, name: u.name, color: u.color }));
     const dist = deadlineDistance(t.deadline, now);
     const done = t.status === "done";
     return {
@@ -74,6 +80,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
       owners, subDone: prog.done, subTotal: prog.total, canEdit: canEdit(t),
       pendingDeadline: !!pendingDeadlineRequest(t),
       dependency: !!t.parentId,
+      parentTitle: t.parentId ? titles.get(t.parentId) : undefined,
       flagged: !!activeFlag(t),
     };
   });
@@ -95,7 +102,13 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
       ) : view === "board" ? (
         <KanbanBoard key={tasks.map((t) => t.id + t.status).join("|") + columns.length} cards={cards} columns={columns} doneLabel={period.label} />
       ) : (
-        <TaskGroups tasks={tasks} users={umap} now={now} collapseDone={false} doneHint={`${periodTitle(period)} · most recent first`} />
+        <TaskGroups tasks={tasks} users={umap} now={now} collapseDone={false} doneHint={`${periodTitle(period)} · most recent first`} titles={titles} />
+      )}
+      {!noTeam && hiddenDone > 0 && (
+        <p className="mt-4 text-xs text-ink-3">
+          {hiddenDone} completed {hiddenDone === 1 ? "task is" : "tasks are"} hidden here.{" "}
+          <Link href={`/tasks?${showDoneParams.toString()}`} className="font-semibold text-accent-deep hover:underline">Show completed</Link>
+        </p>
       )}
     </div>
   );

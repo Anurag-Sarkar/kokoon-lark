@@ -1,12 +1,13 @@
 import Link from "next/link";
 import type { UserStats } from "@/lib/stats";
 import type { UserDTO } from "@/lib/types";
-import { Avatar } from "@/components/ui/Avatar";
+import { Avatar, personHref } from "@/components/ui/Avatar";
+import { LinkSpinner } from "@/components/ui/LinkPending";
 import { ScoreRing } from "@/components/ui/ScoreRing";
 import { LevelPill } from "@/components/ui/Pills";
 import { SectionTitle } from "@/components/shell/PageHeader";
 
-export function TeamPulse({ people, currentUserId, linkToAdmin, hint = "Everyone sees the same picture. Ownership is visible." }: { people: { user: UserDTO; stats: UserStats }[]; currentUserId: string; linkToAdmin: boolean; hint?: string }) {
+export function TeamPulse({ people, currentUserId, hint = "Everyone sees the same picture. Ownership is visible." }: { people: { user: UserDTO; stats: UserStats }[]; currentUserId: string; hint?: string }) {
   const sorted = [...people].sort((a, b) => (b.stats.score ?? -1) - (a.stats.score ?? -1));
   return (
     <section>
@@ -14,11 +15,11 @@ export function TeamPulse({ people, currentUserId, linkToAdmin, hint = "Everyone
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
         {sorted.map(({ user, stats }, i) => {
           const isSelf = user.id === currentUserId;
-          const body = (
-            <>
+          return (
+            <Link key={user.id} href={personHref(user.id)} className={`card p-3.5 block hover:border-line-2 transition ${isSelf ? "ring-2 ring-ink/80" : ""}`} title={`${user.name}'s page`}>
               <div className="flex items-center justify-between">
                 <Avatar user={user} size="md" />
-                <span className="text-[11px] font-semibold text-ink-3 tnum">#{i + 1}</span>
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-ink-3 tnum"><LinkSpinner />#{i + 1}</span>
               </div>
               <div className="mt-3 flex items-center gap-3">
                 <ScoreRing score={stats.score} level={stats.level} size={48} stroke={5}>
@@ -30,13 +31,7 @@ export function TeamPulse({ people, currentUserId, linkToAdmin, hint = "Everyone
                 </div>
               </div>
               <div className="mt-3"><LevelPill level={stats.level} size="sm" /></div>
-            </>
-          );
-          const cls = `card p-3.5 block ${isSelf ? "ring-2 ring-ink/80" : ""} ${linkToAdmin ? "hover:border-line-2 transition" : ""}`;
-          return linkToAdmin ? (
-            <Link key={user.id} href={`/admin/people/${user.id}`} className={cls}>{body}</Link>
-          ) : (
-            <div key={user.id} className={cls}>{body}</div>
+            </Link>
           );
         })}
       </div>

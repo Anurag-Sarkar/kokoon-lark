@@ -3,8 +3,10 @@ import type { TeamSummary } from "@/lib/teams";
 import { pct } from "@/lib/format";
 import { ScoreRing } from "@/components/ui/ScoreRing";
 import { LevelPill } from "@/components/ui/Pills";
-import { OwnerList } from "@/components/ui/Avatar";
+import { OwnerList, PersonLink } from "@/components/ui/Avatar";
+import { LinkSpinner } from "@/components/ui/LinkPending";
 
+/** The whole card opens the team through a stretched link underneath; the owner and member chips link to people. */
 export function TeamCard({ summary: s }: { summary: TeamSummary }) {
   const { team, members, stats } = s;
   const owner = team.ownerId ? members.find((m) => m.id === team.ownerId) ?? null : null;
@@ -15,12 +17,15 @@ export function TeamCard({ summary: s }: { summary: TeamSummary }) {
     { label: "On-time 30d", value: pct(stats.onTimeRate30), cls: "" },
   ];
   return (
-    <Link href={`/admin/teams/${team.id}`} className="card p-4 block hover:border-line-2 transition" style={{ borderLeft: `4px solid ${team.color}` }}>
+    <div className="card relative p-4 hover:border-line-2 transition" style={{ borderLeft: `4px solid ${team.color}` }}>
+      <Link href={`/admin/teams/${team.id}`} className="absolute inset-0 rounded-[inherit] focus-visible:outline-2 focus-visible:outline-accent" aria-label={`${team.name} team`}>
+        <LinkSpinner className="absolute right-3 top-3" />
+      </Link>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-sm font-semibold truncate">{team.name}</div>
           <div className="text-xs text-ink-3 mt-0.5 truncate">{members.length} {members.length === 1 ? "person" : "people"}{team.description ? ` · ${team.description}` : ""}</div>
-          <div className="text-xs mt-0.5 truncate">{owner ? <><span className="text-ink-3">Owner · </span><span className="font-medium text-ink-2">{owner.name}</span></> : <span className="text-warn-text">No owner yet</span>}</div>
+          <div className="text-xs mt-0.5 flex items-center gap-1 min-w-0">{owner ? <><span className="text-ink-3">Owner ·</span><PersonLink user={owner} size="xs" nameClassName="text-xs font-medium text-ink-2" /></> : <span className="text-warn-text">No owner yet</span>}</div>
           <div className="mt-2 flex items-center gap-2">
             <LevelPill level={s.level} size="sm" />
             {s.needNudge > 0 && <span className="text-[11px] font-semibold text-critical-text">{s.needNudge} need{s.needNudge === 1 ? "s" : ""} a nudge</span>}
@@ -41,6 +46,6 @@ export function TeamCard({ summary: s }: { summary: TeamSummary }) {
       <div className="mt-3 pt-3 border-t border-line">
         <OwnerList users={members} size="xs" emptyLabel="No members yet" />
       </div>
-    </Link>
+    </div>
   );
 }

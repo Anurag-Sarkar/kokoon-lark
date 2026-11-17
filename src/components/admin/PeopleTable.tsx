@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import type { Level } from "@/lib/stats";
-import { Avatar } from "@/components/ui/Avatar";
+import { Avatar, personHref } from "@/components/ui/Avatar";
+import { LinkSpinner } from "@/components/ui/LinkPending";
 import { LevelPill } from "@/components/ui/Pills";
 
 export interface PersonRow {
@@ -77,13 +78,14 @@ export function PeopleTable({ rows }: { rows: PersonRow[] }) {
           {sorted.map((r) => (
             <tr key={r.id} className="border-b border-line last:border-b-0 hover:bg-surface-2">
               <td className="px-3 py-2.5">
-                <Link href={`/admin/people/${r.id}`} className="flex items-center gap-2.5 min-w-0">
+                <Link href={personHref(r.id)} className="flex items-center gap-2.5 min-w-0">
                   <Avatar user={r} size="sm" />
                   <span className="min-w-0">
                     <span className="block font-medium truncate hover:underline">{r.name}</span>
                     <span className="block text-[11px] text-ink-3 truncate">{r.title}</span>
                   </span>
                   <span className="ml-2"><LevelPill level={r.level} size="sm" /></span>
+                  <LinkSpinner />
                 </Link>
               </td>
               <td className="px-3 py-2.5 text-right font-semibold">{r.score ?? "–"}</td>

@@ -1,8 +1,8 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
-import { CheckCircle2, ChevronLeft, ChevronRight, LayoutList, Search, SquareKanban, X } from "lucide-react";
+import { useEffect, useState, useTransition } from "react";
+import { CheckCircle2, ChevronLeft, ChevronRight, LayoutList, Loader2, Search, SquareKanban, X } from "lucide-react";
 import { PRIORITIES, PRIORITY_LABEL, STATUSES, STATUS_LABEL, type TeamDTO, type UserDTO } from "@/lib/types";
 import type { Period } from "@/lib/period";
 
@@ -25,11 +25,14 @@ export function TaskFilters({ users, teams, isAdmin, scope, teamId, period, show
   const path = usePathname();
   const sp = useSearchParams();
   const [q, setQ] = useState(sp.get("q") ?? "");
+  // Filter changes re-render the page in place, so the old list stays until the new one arrives: show that it's coming.
+  const [pending, startTransition] = useTransition();
+  const navigate = (url: string) => startTransition(() => router.replace(url, { scroll: false }));
 
   const setMany = (entries: Record<string, string>) => {
     const next = new URLSearchParams(sp.toString());
     for (const [key, value] of Object.entries(entries)) { if (value) next.set(key, value); else next.delete(key); }
-    router.replace(`${path}?${next.toString()}`, { scroll: false });
+    navigate(`${path}?${next.toString()}`);
   };
   const set = (key: string, value: string) => setMany({ [key]: value });
 
@@ -59,7 +62,7 @@ export function TaskFilters({ users, teams, isAdmin, scope, teamId, period, show
     setQ("");
     const next = new URLSearchParams();
     for (const k of KEEP_ON_CLEAR) { const v = sp.get(k); if (v) next.set(k, v); }
-    router.replace(`${path}?${next.toString()}`, { scroll: false });
+    navigate(`${path}?${next.toString()}`);
   };
 
   const seg = (on: boolean) => `h-8 px-3 rounded-lg text-xs font-semibold transition ${on ? "bg-ink text-white" : "text-ink-2 hover:bg-surface-2"}`;
@@ -127,6 +130,7 @@ export function TaskFilters({ users, teams, isAdmin, scope, teamId, period, show
       {active > 0 && (
         <button type="button" onClick={clearFilters} className="btn btn-ghost btn-sm"><X className="size-3.5" />Clear</button>
       )}
+      {pending && <Loader2 className="pending-in size-4 animate-spin text-ink-3" role="status" aria-label="Updating" />}
       <div className="ml-auto inline-flex rounded-[10px] border border-line-2 bg-surface p-0.5">
         <button type="button" onClick={() => set("view", "")} className={`h-8 px-2.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition ${view !== "board" ? "bg-ink text-white" : "text-ink-2 hover:bg-surface-2"}`}><LayoutList className="size-3.5" />List</button>
         <button type="button" onClick={() => set("view", "board")} className={`h-8 px-2.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition ${view === "board" ? "bg-ink text-white" : "text-ink-2 hover:bg-surface-2"}`}><SquareKanban className="size-3.5" />Board</button>

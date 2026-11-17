@@ -18,6 +18,7 @@ export default async function AdminPage() {
   const now = new Date();
   const [users, tasks, teams] = await Promise.all([listUsers(), listAllTasks(), listTeams()]);
   const umap = userMap(users);
+  const titles = new Map(tasks.map((t) => [t.id, t.title]));
   const team = computeTeamStats(users, tasks, now);
   const teamSummaries = teams.map((t) => summarizeTeam(t, users, tasks, now)).sort((a, b) => (a.score ?? 101) - (b.score ?? 101));
   const delta = team.completedThisWeek - team.completedLastWeek;
@@ -70,7 +71,7 @@ export default async function AdminPage() {
 
       <section>
         <SectionTitle hint="Every open task past its deadline, oldest first">Overdue across the team</SectionTitle>
-        {overdueTasks.length === 0 ? <EmptyState title="Nothing overdue" body="The whole team is inside their deadlines." /> : <div className="card overflow-hidden">{overdueTasks.map((t) => <TaskRow key={t.id} task={t} users={umap} now={now} />)}</div>}
+        {overdueTasks.length === 0 ? <EmptyState title="Nothing overdue" body="The whole team is inside their deadlines." /> : <div className="card overflow-hidden">{overdueTasks.map((t) => <TaskRow key={t.id} task={t} users={umap} now={now} parentTitle={t.parentId ? titles.get(t.parentId) : undefined} />)}</div>}
       </section>
     </div>
   );

@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/auth";
 import { listAllTasks, listUsers, userMap } from "@/lib/queries";
 import { fmtShortDateTime, shiftLabel, timeAgo } from "@/lib/format";
 import { PageHeader, SectionTitle, EmptyState } from "@/components/shell/PageHeader";
-import { Avatar } from "@/components/ui/Avatar";
+import { Avatar, PersonLink, personHref } from "@/components/ui/Avatar";
 import { pendingDeadlineRequest } from "@/lib/approvals";
 
 export default async function DeadlineLogPage() {
@@ -34,7 +34,7 @@ export default async function DeadlineLogPage() {
               return (
                 <li key={r.id} className="px-4 py-3 text-sm flex flex-wrap items-center gap-x-3 gap-y-1">
                   <Link href={`/tasks/${task.id}`} className="font-medium hover:underline">{task.title}</Link>
-                  <span className="text-ink-2 inline-flex items-center gap-1.5">{u && <Avatar user={u} size="xs" />}{u?.name ?? "Someone"} · {fmtShortDateTime(task.deadline)} → {fmtShortDateTime(r.newDeadline)} · {timeAgo(r.createdAt, now)}</span>
+                  <span className="text-ink-2 inline-flex items-center gap-1.5">{u ? <PersonLink user={u} size="xs" nameClassName="text-sm text-ink-2" /> : "Someone"} · {fmtShortDateTime(task.deadline)} → {fmtShortDateTime(r.newDeadline)} · {timeAgo(r.createdAt, now)}</span>
                   <span className="basis-full text-xs text-ink-3">“{r.reason}”</span>
                 </li>
               );
@@ -51,7 +51,7 @@ export default async function DeadlineLogPage() {
               const u = umap.get(uid);
               if (!u) return null;
               return (
-                <Link key={uid} href={`/admin/people/${uid}`} className={`card inline-flex items-center gap-2 px-3 py-2 text-sm hover:border-line-2 ${n >= 3 ? "ring-2 ring-warn/50" : ""}`}>
+                <Link key={uid} href={personHref(uid)} className={`card inline-flex items-center gap-2 px-3 py-2 text-sm hover:border-line-2 ${n >= 3 ? "ring-2 ring-warn/50" : ""}`}>
                   <Avatar user={u} size="sm" />
                   <span className="font-medium">{u.name}</span>
                   <span className="pill bg-warn-soft text-warn-text">{n}</span>
@@ -84,8 +84,8 @@ export default async function DeadlineLogPage() {
                     <tr key={c.id} className="border-b border-line last:border-b-0 align-top">
                       <td className="px-4 py-3 text-ink-2 whitespace-nowrap">{timeAgo(c.createdAt, now)}<div className="text-[11px] text-ink-3">{fmtShortDateTime(c.createdAt)}</div></td>
                       <td className="px-4 py-3"><Link href={`/tasks/${c.task.id}`} className="font-medium hover:underline">{c.task.title}</Link></td>
-                      <td className="px-4 py-3">{u ? <span className="inline-flex items-center gap-2"><Avatar user={u} size="xs" />{u.name}</span> : "—"}</td>
-                      <td className="px-4 py-3">{(() => { const a = c.approvedBy ? umap.get(c.approvedBy) : null; return a ? <span className="inline-flex items-center gap-2"><Avatar user={a} size="xs" />{a.name}{c.approvedBy === c.changedBy ? <span className="text-ink-3"> (direct)</span> : null}</span> : <span className="text-ink-3">—</span>; })()}</td>
+                      <td className="px-4 py-3">{u ? <PersonLink user={u} size="xs" nameClassName="text-sm" /> : "—"}</td>
+                      <td className="px-4 py-3">{(() => { const a = c.approvedBy ? umap.get(c.approvedBy) : null; return a ? <span className="inline-flex items-center gap-1.5"><PersonLink user={a} size="xs" nameClassName="text-sm" />{c.approvedBy === c.changedBy ? <span className="text-ink-3">(direct)</span> : null}</span> : <span className="text-ink-3">—</span>; })()}</td>
                       <td className="px-4 py-3 text-ink-2 whitespace-nowrap"><div>{fmtShortDateTime(c.oldDeadline)} → {fmtShortDateTime(c.newDeadline)}</div><div className="text-[11px] text-warn-text font-semibold">{shiftLabel(c.oldDeadline, c.newDeadline)}</div></td>
                       <td className="px-4 py-3 text-ink-2 max-w-md">“{c.reason}”</td>
                     </tr>

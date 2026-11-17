@@ -6,7 +6,7 @@ import { canReview, isTeamOwner, pendingDeadlineRequest, reviewerLabel, reviewer
 import { fmtShortDateTime, shiftLabel, timeAgo } from "@/lib/format";
 import type { DeadlineRequestDTO, TaskDTO, UserDTO } from "@/lib/types";
 import { PageHeader, SectionTitle, EmptyState } from "@/components/shell/PageHeader";
-import { Avatar } from "@/components/ui/Avatar";
+import { PersonLink } from "@/components/ui/Avatar";
 import { ReviewButtons } from "@/components/approvals/ReviewButtons";
 
 type Item = { task: TaskDTO; req: DeadlineRequestDTO };
@@ -18,8 +18,8 @@ function RequestCard({ item: { task, req }, requester, now, footer, children }: 
         <div className="min-w-0">
           <Link href={`/tasks/${task.id}`} className="text-sm font-semibold hover:underline">{task.title}</Link>
           <div className="mt-1 flex items-center gap-2 text-xs text-ink-2">
-            {requester && <Avatar user={requester} size="xs" />}
-            <span><span className="font-medium text-ink">{requester?.name ?? "Someone"}</span> · asked {timeAgo(req.createdAt, now)}</span>
+            {requester ? <PersonLink user={requester} size="xs" nameClassName="text-xs font-medium text-ink" /> : <span className="font-medium text-ink">Someone</span>}
+            <span>· asked {timeAgo(req.createdAt, now)}</span>
           </div>
         </div>
         <div className="text-xs text-right">

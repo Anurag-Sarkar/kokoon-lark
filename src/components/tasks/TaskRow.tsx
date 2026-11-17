@@ -7,9 +7,14 @@ import { pendingDeadlineRequest } from "@/lib/approvals";
 import { activeFlag } from "@/lib/integrity";
 import type { TaskDTO, UserDTO } from "@/lib/types";
 import { OwnerList } from "@/components/ui/Avatar";
+import { LinkSpinner } from "@/components/ui/LinkPending";
 import { HealthPill, PriorityMark, StatusPill, Tag } from "@/components/ui/Pills";
 
-export function TaskRow({ task, users, now, showOwners = true }: { task: TaskDTO; users: Map<string, UserDTO>; now: Date; showOwners?: boolean }) {
+/**
+ * One task in a list. The whole row is clickable through a stretched link underneath, so the owner
+ * chips can be links of their own without nesting anchors.
+ */
+export function TaskRow({ task, users, now, showOwners = true, parentTitle }: { task: TaskDTO; users: Map<string, UserDTO>; now: Date; showOwners?: boolean; /** title of the task this one feeds, when it is a dependency */ parentTitle?: string }) {
   const h = taskHealth(task, now);
   const owners = task.assignees.map((id) => users.get(id)).filter((u): u is UserDTO => !!u);
   const prog = subtaskProgress(task);
@@ -18,7 +23,10 @@ export function TaskRow({ task, users, now, showOwners = true }: { task: TaskDTO
   const deadlineText = isDone && task.completedAt ? `Done ${fmtDateTime(task.completedAt, now)} · ${latenessLabel(task.deadline, task.completedAt)}` : `${fmtDateTime(task.deadline, now)} · ${dist.label}`;
 
   return (
-    <Link href={`/tasks/${task.id}`} className="row-link grid grid-cols-[auto_minmax(0,1fr)_auto] sm:grid-cols-[auto_minmax(0,1fr)_auto_auto_auto] items-center gap-x-3 gap-y-1 px-3 py-2.5 border-t border-line first:border-t-0">
+    <div className="row-link relative grid grid-cols-[auto_minmax(0,1fr)_auto] sm:grid-cols-[auto_minmax(0,1fr)_auto_auto_auto] items-center gap-x-3 gap-y-1 px-3 py-2.5 border-t border-line first:border-t-0">
+      <Link href={`/tasks/${task.id}`} className="absolute inset-0 focus-visible:outline-2 focus-visible:outline-accent focus-visible:-outline-offset-2" aria-label={task.title}>
+        <LinkSpinner className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-surface" />
+      </Link>
       <PriorityMark priority={task.priority} />
       <div className="min-w-0">
         <div className={`text-sm font-medium truncate ${isDone ? "text-ink-2" : ""}`}>{task.title}</div>
@@ -26,7 +34,7 @@ export function TaskRow({ task, users, now, showOwners = true }: { task: TaskDTO
           <span className={h === "overdue" ? "text-critical-text font-semibold" : h === "due_soon" ? "text-warn-text font-semibold" : ""}>{deadlineText}</span>
           {task.deadlineChanges.length > 0 && <span>· moved {task.deadlineChanges.length}×</span>}
           {pendingDeadlineRequest(task) && <span className="text-accent-deep font-semibold">· change pending approval</span>}
-          {task.parentId && <span>· dependency</span>}
+          {task.parentId && <span className="inline-flex max-w-[260px] min-w-0">· dependency{parentTitle ? <>&nbsp;of&nbsp;<span className="truncate text-ink-2">{parentTitle}</span></> : ""}</span>}
           {activeFlag(task) && <span className="text-critical-text font-semibold">· flagged</span>}
           {task.tags.slice(0, 3).map((t) => <Tag key={t}>{t}</Tag>)}
           {showOwners && <span className="sm:hidden basis-full text-ink-2">{owners.length ? owners.map((u) => u.name).join(", ") : "Unassigned"}</span>}
@@ -39,6 +47,6 @@ export function TaskRow({ task, users, now, showOwners = true }: { task: TaskDTO
       ) : <span className="hidden sm:block" />}
       {showOwners ? <span className="hidden sm:flex justify-end max-w-[280px]"><OwnerList users={owners} size="xs" className="justify-end" /></span> : <span className="hidden sm:block" />}
       <span className="justify-self-end">{isDone ? <HealthPill health={h} /> : h === "on_track" ? <StatusPill status={task.status} /> : <HealthPill health={h} label={dist.label} />}</span>
-    </Link>
+    </div>
   );
 }

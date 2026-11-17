@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CalendarClock, Check, Pencil, Plus, Trash2, Users, X } from "lucide-react";
@@ -8,7 +9,7 @@ import { toDatetimeLocal } from "@/lib/format";
 import { PRIORITIES, PRIORITY_LABEL, STATUSES, STATUS_LABEL, type Priority, type Status, type SubtaskDTO, type TaskDTO, type UserDTO } from "@/lib/types";
 import { useAction } from "@/components/useAction";
 import { Modal } from "@/components/ui/Modal";
-import { Avatar } from "@/components/ui/Avatar";
+import { Avatar, personHref } from "@/components/ui/Avatar";
 import { UserCheckList } from "@/components/ui/UserCheckList";
 
 function ErrorLine({ error }: { error: string | null }) {
@@ -134,7 +135,7 @@ export function SubtaskList({ task, subtasks, users, canEdit }: { task: TaskDTO;
             <li key={s.id} className="group flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-surface-2">
               <input type="checkbox" checked={s.isDone} disabled={!canEdit || pending} onChange={(e) => run(() => toggleSubtask(task.id, s.id, e.target.checked))} className="accent-ink size-4" aria-label={s.title} />
               <span className={`flex-1 text-sm ${s.isDone ? "line-through text-ink-3" : ""}`}>{s.title}</span>
-              {who && <Avatar user={who} size="xs" />}
+              {who && <Link href={personHref(who.id)} className="shrink-0" title={`Done by ${who.name}`}><Avatar user={who} size="xs" /></Link>}
               {canEdit && <button type="button" onClick={() => run(() => removeSubtask(task.id, s.id))} className="btn btn-ghost btn-xs px-1 opacity-0 group-hover:opacity-100" aria-label="Remove subtask"><Trash2 className="size-3.5" /></button>}
             </li>
           );

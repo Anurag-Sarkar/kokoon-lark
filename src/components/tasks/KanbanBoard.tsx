@@ -7,6 +7,7 @@ import { setTaskStatus } from "@/lib/actions";
 import { STATUSES, STATUS_LABEL, type Priority, type Status } from "@/lib/types";
 import { useAction } from "@/components/useAction";
 import { OwnerList } from "@/components/ui/Avatar";
+import { LinkSpinner } from "@/components/ui/LinkPending";
 import { PriorityMark } from "@/components/ui/Pills";
 
 export interface KanbanCard {
@@ -16,7 +17,7 @@ export interface KanbanCard {
   status: Status;
   deadlineLabel: string;
   deadlineTone: "overdue" | "soon" | "ok" | "done_on_time" | "done_late";
-  owners: { name: string; color: string }[];
+  owners: { id: string; name: string; color: string }[];
   subDone: number;
   subTotal: number;
   canEdit: boolean;
@@ -24,6 +25,8 @@ export interface KanbanCard {
   pendingDeadline: boolean;
   /** this task feeds another task */
   dependency: boolean;
+  /** title of the task it feeds */
+  parentTitle?: string;
   /** marked done but a reviewer flagged it as not done */
   flagged: boolean;
 }
@@ -83,11 +86,11 @@ export function KanbanBoard({ cards: initial, columns = STATUSES, doneLabel }: {
                     <div className="flex items-start gap-2">
                       {c.canEdit && <GripVertical className="size-4 text-line-2 shrink-0 mt-0.5" aria-hidden />}
                       <div className="min-w-0 flex-1">
-                        <Link href={`/tasks/${c.id}`} className="text-sm font-medium leading-snug hover:underline block">{c.title}</Link>
+                        <Link href={`/tasks/${c.id}`} className="text-sm font-medium leading-snug hover:underline">{c.title}<LinkSpinner className="ml-1.5 inline-block align-middle" /></Link>
                         <div className={`mt-1 text-[11px] font-medium ${TONE[c.deadlineTone]}`}>{c.deadlineLabel}</div>
                         {c.pendingDeadline && <div className="mt-0.5 text-[11px] font-semibold text-accent-deep">Deadline change pending approval</div>}
                         {c.flagged && <div className="mt-0.5 text-[11px] font-semibold text-critical-text">Flagged: marked done but wasn't</div>}
-                        {c.dependency && <div className="mt-0.5 text-[11px] text-ink-3">Dependency for another task</div>}
+                        {c.dependency && <div className="mt-0.5 text-[11px] text-ink-3 truncate" title={c.parentTitle}>{c.parentTitle ? `Feeds: ${c.parentTitle}` : "Dependency for another task"}</div>}
                       </div>
                       <PriorityMark priority={c.priority} />
                     </div>

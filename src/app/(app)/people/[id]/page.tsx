@@ -1,0 +1,121 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
+import { requireUser } from "@/lib/auth";
+import { getUser, listAllTasks, listTeams, listUsers, userMap } from "@/lib/queries";
+import { computeUserStats } from "@/lib/stats";
+import { peerIds, teamsOf } from "@/lib/teams";
+import { fmtShortDateTime, shiftLabel } from "@/lib/format";
+import { PageHeader, SectionTitle, EmptyState } from "@/components/shell/PageHeader";
+import { PulseCard } from "@/components/dashboard/PulseCard";
+import { AttentionList } from "@/components/dashboard/AttentionList";
+import { WeeklyCompletionsChart } from "@/components/charts/WeeklyCompletionsChart";
+import { StatTile } from "@/components/ui/StatTile";
+import { TaskGroups } from "@/components/tasks/TaskGroups";
+import { Avatar } from "@/components/ui/Avatar";
+import { LinkSpinner } from "@/components/ui/LinkPending";
+
+/**
+ * One person's page, reachable from any name or avatar in the app. Admins see everything (the former
+ * /admin/people/[id]). Members see the full picture for themselves and their teammates, the same people
+ * as on their Team pulse, and for anyone else only the work they share.
+ */
+export default async function PersonPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const viewer = await requireUser();
+  const [person, users, tasks, teams] = await Promise.all([getUser(id), listUsers({ includeInactive: true }), listAllTasks(), listTeams()]);
+  if (!person) notFound();
+  const now = new Date();
+  const umap = userMap(users);
+  const isAdmin = viewer.role === "admin";
+  const isSelf = person.id === viewer.id;
+  const first = person.name.split(" ")[0];
+  const viewerTeams = teamsOf(viewer.id, teams);
+  const personTeams = teamsOf(person.id, teams);
+  const full = isAdmin || isSelf || viewerTeams.length === 0 || peerIds(viewer.id, teams).has(person.id);
+
+  const theirs = tasks.filter((t) => t.assignees.includes(person.id));
+  const shown = full ? theirs : theirs.filter((t) => t.assignees.includes(viewer.id) || t.createdBy === viewer.id);
+  const stats = computeUserStats(person.id, tasks, now);
+  const titles = new Map(tasks.map((t) => [t.id, t.title]));
+  const moves = isAdmin
+    ? tasks.flatMap((t) => t.deadlineChanges.filter((d) => d.changedBy === person.id).map((d) => ({ ...d, task: t }))).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    : [];
+  const back = isAdmin ? { href: "/admin", label: "Team overview" } : { href: "/dashboard", label: "Dashboard" };
+  const roleLabel = person.title || (person.role === "admin" ? "Admin" : "Member");
+
+  return (
+    <div className="grid grid-cols-1 gap-6">
+      <div>
+        <Link href={back.href} className="inline-flex items-center gap-1.5 text-sm text-ink-2 hover:text-ink mb-4"><ArrowLeft className="size-4" />{back.label}<LinkSpinner /></Link>
+        <PageHeader
+          title={<span className="inline-flex items-center gap-3"><Avatar user={person} size="lg" />{person.name}{isSelf && <span className="text-base font-normal text-ink-3">(you)</span>}</span>}
+          subtitle={
+            <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span>{roleLabel}{full ? ` · ${person.email}` : ""}{person.active ? "" : " · deactivated"}</span>
+              {personTeams.map((t) => (
+                <span key={t.id} className="pill h-5 text-[11px] bg-surface-2 text-ink-2 gap-1 border border-line">
+                  <span className="size-1.5 rounded-full" style={{ backgroundColor: t.color }} aria-hidden />{t.name}{t.ownerId === person.id ? " · owner" : ""}
+                </span>
+              ))}
+            </span>
+          }
+          actions={isSelf ? <Link href="/account" className="btn btn-secondary">Account settings<LinkSpinner /></Link> : undefined}
+        />
+      </div>
+
+      {full ? (
+        <>
+          <PulseCard user={person} stats={stats} isSelf={isSelf} now={now} />
+          <div className={`grid grid-cols-2 gap-3 ${isAdmin ? "md:grid-cols-3 xl:grid-cols-6" : "md:grid-cols-5"}`}>
+            <StatTile label="Open" value={stats.ongoing} tone="accent" hint={`${stats.onTrack} on track`} />
+            <StatTile label="Overdue" value={stats.overdue} tone="critical" emphasize={stats.overdue > 0} />
+            <StatTile label="Due in 48h" value={stats.dueSoon} tone="warn" />
+            <StatTile label="Done on time" value={stats.doneOnTime} tone="good" hint={`${stats.doneOnTime30} this month`} />
+            <StatTile label="Done late" value={stats.doneLate} tone="critical" hint={`${stats.doneLate30} this month`} />
+            {isAdmin && <StatTile label="Flagged" value={stats.flagsTotal} tone="critical" emphasize={stats.flags30 > 0} hint={stats.flagsTotal > 0 ? `${stats.flags30} this month · marked done but wasn't` : "never"} />}
+          </div>
+          <div className="grid lg:grid-cols-2 gap-4">
+            <WeeklyCompletionsChart data={stats.weekly} title={`${isSelf ? "Your" : `${first}'s`} completions by week`} hint="Last 8 weeks · on time vs late" />
+            <AttentionList tasks={theirs} users={umap} now={now} title={isSelf ? "Needs your attention" : "Needs their attention"} />
+          </div>
+        </>
+      ) : (
+        <div className="card p-5 text-sm text-ink-2">
+          You and {first} aren&apos;t in the same team, so their score and full task list stay with their team. The work you share is below.
+        </div>
+      )}
+
+      {isAdmin && (
+        <section>
+          <SectionTitle hint={`Every deadline ${first} has moved, with the reason given`}>Deadline changes <span className="text-ink-3 font-normal tnum">{moves.length}</span></SectionTitle>
+          {moves.length === 0 ? <EmptyState title="No deadline changes" body="They have never moved a deadline." /> : (
+            <div className="card divide-y divide-line">
+              {moves.map((m) => (
+                <div key={m.id} className="px-4 py-3 text-sm">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <Link href={`/tasks/${m.task.id}`} className="font-medium hover:underline">{m.task.title}</Link>
+                    <span className="text-xs text-ink-3">{shiftLabel(m.oldDeadline, m.newDeadline)} · {fmtShortDateTime(m.createdAt)}</span>
+                  </div>
+                  <div className="text-xs text-ink-3 mt-0.5">{fmtShortDateTime(m.oldDeadline)} → {fmtShortDateTime(m.newDeadline)}</div>
+                  <div className="mt-1.5 inline-block rounded-md bg-warn-soft text-warn-text text-xs px-2 py-1">“{m.reason}”</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      <section>
+        <SectionTitle hint={full ? (isSelf ? "Everything assigned to you" : "Everything assigned to them") : `Tasks you share with ${first}`}>Tasks</SectionTitle>
+        <TaskGroups
+          tasks={shown}
+          users={umap}
+          now={now}
+          titles={titles}
+          empty={full ? { title: isSelf ? "Nothing assigned to you yet" : `Nothing assigned to ${first} yet` } : { title: "No shared tasks", body: `Nothing is assigned to both you and ${first}, and you haven't created anything for them.` }}
+        />
+      </section>
+    </div>
+  );
+}

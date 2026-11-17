@@ -6,6 +6,7 @@ import { CalendarClock, ClipboardCheck, LayoutDashboard, ListTodo, LogOut, Plus,
 import { logout } from "@/lib/actions";
 import type { UserDTO } from "@/lib/types";
 import { Avatar } from "@/components/ui/Avatar";
+import { LinkSpinner } from "@/components/ui/LinkPending";
 
 type Item = { href: string; label: string; icon: React.ComponentType<{ className?: string }>; match: (path: string, view: string | null) => boolean; badge?: number };
 
@@ -21,7 +22,7 @@ export function Sidebar({ user, approvals }: { user: UserDTO; approvals?: { show
     ...(approvals?.show ? [{ href: "/approvals", label: "Approvals", icon: ClipboardCheck, match: (p: string) => p === "/approvals", badge: approvals.count } as Item] : []),
   ];
   const admin: Item[] = [
-    { href: "/admin", label: "Team overview", icon: Users, match: (p) => p === "/admin" || p.startsWith("/admin/people/") },
+    { href: "/admin", label: "Team overview", icon: Users, match: (p) => p === "/admin" || p.startsWith("/people/") },
     { href: "/admin/teams", label: "Teams", icon: UsersRound, match: (p) => p.startsWith("/admin/teams") },
     { href: "/admin/people", label: "People", icon: UserCog, match: (p) => p === "/admin/people" },
     { href: "/admin/deadline-changes", label: "Deadline log", icon: CalendarClock, match: (p) => p === "/admin/deadline-changes" },
@@ -32,7 +33,10 @@ export function Sidebar({ user, approvals }: { user: UserDTO; approvals?: { show
       <Link key={href} href={href} className="nav-link" data-active={match(path, view)}>
         <Icon className="size-4 shrink-0" />
         <span className="truncate">{label}</span>
-        {badge ? <span className="ml-auto inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-accent text-white text-[10px] font-semibold tnum" aria-label={`${badge} waiting`}>{badge}</span> : null}
+        <span className="ml-auto inline-flex items-center gap-1.5">
+          {badge ? <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-accent text-white text-[10px] font-semibold tnum" aria-label={`${badge} waiting`}>{badge}</span> : null}
+          <LinkSpinner />
+        </span>
       </Link>
     ));
 
@@ -43,7 +47,7 @@ export function Sidebar({ user, approvals }: { user: UserDTO; approvals?: { show
           <span className="inline-block size-7 rounded-lg bg-ink" aria-hidden />
           <span className="font-semibold tracking-tight">Kokoon Task</span>
         </Link>
-        <Link href="/tasks/new" className="btn btn-primary btn-sm lg:hidden"><Plus className="size-4" />New</Link>
+        <Link href="/tasks/new" className="btn btn-primary btn-sm lg:hidden"><Plus className="size-4" />New<LinkSpinner /></Link>
       </div>
 
       <nav className="flex lg:flex-col gap-1 px-3 pb-3 lg:pb-0 overflow-x-auto scrollbar-thin lg:overflow-visible">
@@ -57,7 +61,7 @@ export function Sidebar({ user, approvals }: { user: UserDTO; approvals?: { show
       </nav>
 
       <div className="hidden lg:block px-3 mt-4">
-        <Link href="/tasks/new" className="btn btn-primary w-full"><Plus className="size-4" />New task</Link>
+        <Link href="/tasks/new" className="btn btn-primary w-full"><Plus className="size-4" />New task<LinkSpinner /></Link>
       </div>
 
       <div className="hidden lg:flex mt-auto items-center gap-3 border-t border-line px-4 py-4">
@@ -67,6 +71,7 @@ export function Sidebar({ user, approvals }: { user: UserDTO; approvals?: { show
             <div className="text-sm font-semibold truncate">{user.name}</div>
             <div className="text-xs text-ink-3 truncate">{user.role === "admin" ? "Admin" : user.title || "Member"}</div>
           </div>
+          <LinkSpinner />
         </Link>
         <form action={logout}>
           <button type="submit" className="btn btn-ghost btn-sm px-2" title="Sign out" aria-label="Sign out"><LogOut className="size-4" /></button>

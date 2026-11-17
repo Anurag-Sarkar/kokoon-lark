@@ -5,13 +5,13 @@ import { requireUser } from "@/lib/auth";
 import { getTask, listChildTasks, listTeams, listUsers, userMap } from "@/lib/queries";
 import { activeFlag, canFlag } from "@/lib/integrity";
 import { AddDependencyButton, ClearFlagButton, FlagButton } from "@/components/tasks/Dependencies";
-import { OwnerList } from "@/components/ui/Avatar";
+import { Avatar, OwnerList, PersonLink, personHref } from "@/components/ui/Avatar";
+import { LinkSpinner } from "@/components/ui/LinkPending";
 import { taskHealth } from "@/lib/stats";
 import { canReview, changesApplyDirectly, pendingDeadlineRequest, reviewerLabel, reviewersFor } from "@/lib/approvals";
 import { ReviewButtons } from "@/components/approvals/ReviewButtons";
 import { deadlineDistance, fmtDateTime, fmtShortDateTime, latenessLabel, shiftLabel, timeAgo } from "@/lib/format";
 import { PRIORITY_LABEL, type UserDTO } from "@/lib/types";
-import { Avatar } from "@/components/ui/Avatar";
 import { HealthPill, PriorityMark, StatusPill, Tag } from "@/components/ui/Pills";
 import { AssigneeEditor, CommentBox, DeadlineChanger, DeleteTaskButton, StatusControl, SubtaskList, TaskEditor } from "./parts";
 
@@ -95,8 +95,10 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
                   const cOwners = c.assignees.map((a) => umap.get(a)).filter((u): u is UserDTO => !!u);
                   const cFlag = activeFlag(c);
                   return (
-                    <li key={c.id}>
-                      <Link href={`/tasks/${c.id}`} className="row-link grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-1 rounded-lg px-3 py-2 border border-line hover:border-line-2">
+                    <li key={c.id} className="row-link relative grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-1 rounded-lg px-3 py-2 border border-line hover:border-line-2">
+                      <Link href={`/tasks/${c.id}`} className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-accent" aria-label={c.title}>
+                        <LinkSpinner className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-surface" />
+                      </Link>
                         <span className="min-w-0">
                           <span className={`block text-sm font-medium truncate ${c.status === "done" ? "text-ink-2" : ""}`}>{c.title}</span>
                           <span className={`block text-[11px] ${ch === "overdue" ? "text-critical-text font-semibold" : ch === "due_soon" ? "text-warn-text font-semibold" : "text-ink-3"}`}>
@@ -106,7 +108,6 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
                         </span>
                         <span className="hidden sm:flex justify-end max-w-[220px]"><OwnerList users={cOwners} size="xs" className="justify-end" /></span>
                         <span className="justify-self-end">{c.status === "done" ? <HealthPill health={ch} /> : ch === "on_track" ? <StatusPill status={c.status} /> : <HealthPill health={ch} label={cd.label} />}</span>
-                      </Link>
                     </li>
                   );
                 })}
@@ -121,9 +122,9 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
                 const u = umap.get(c.userId);
                 return (
                   <li key={c.id} className="flex gap-3">
-                    {u && <Avatar user={u} size="md" />}
+                    {u && <Link href={personHref(u.id)} className="shrink-0" title={`${u.name}'s page`}><Avatar user={u} size="md" /></Link>}
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline gap-2"><span className="text-sm font-semibold">{u?.name ?? "Unknown"}</span><span className="text-[11px] text-ink-3">{timeAgo(c.createdAt, now)}</span></div>
+                      <div className="flex items-baseline gap-2">{u ? <Link href={personHref(u.id)} className="text-sm font-semibold hover:underline">{u.name}</Link> : <span className="text-sm font-semibold">Unknown</span>}<span className="text-[11px] text-ink-3">{timeAgo(c.createdAt, now)}</span></div>
                       <p className="mt-0.5 text-sm text-ink-2 whitespace-pre-wrap leading-relaxed">{c.body}</p>
                     </div>
                   </li>
@@ -143,7 +144,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
             {!isDone && openChildren > 0 && <p className="text-[11px] text-warn-text font-semibold">{openChildren} {openChildren === 1 ? "dependency is" : "dependencies are"} still open.</p>}
             {flag && (
               <div className="rounded-xl border border-critical/40 bg-critical-soft p-3 grid gap-1.5 text-xs">
-                <div className="flex items-center gap-1.5 font-semibold text-critical-text"><ShieldAlert className="size-3.5" />Flagged by {flagger?.name ?? "a reviewer"} · {timeAgo(flag.createdAt, now)}</div>
+                <div className="flex items-center gap-1.5 font-semibold text-critical-text"><ShieldAlert className="size-3.5" />Flagged by {flagger ? <Link href={personHref(flagger.id)} className="hover:underline">{flagger.name}</Link> : "a reviewer"} · {timeAgo(flag.createdAt, now)}</div>
                 <div className="text-ink-2">Marked done, but the work wasn't done. Reopened, and it counts against the owners' score until cleared.</div>
                 <div className="rounded-md bg-surface px-2 py-1 text-ink-2">“{flag.reason}”</div>
                 {mayFlag && <div className="pt-1"><ClearFlagButton taskId={task.id} flagId={flag.id} /></div>}
@@ -151,7 +152,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
             )}
             {isDone && !flag && mayFlag && <FlagButton taskId={task.id} />}
             {isDone && task.completedAt && (
-              <p className="text-xs text-ink-2">Completed {fmtDateTime(task.completedAt, now)}{task.completedBy && umap.get(task.completedBy) ? ` by ${umap.get(task.completedBy)!.name}` : ""} · <span className={h === "done_late" ? "text-critical-text font-semibold" : "text-good-text font-semibold"}>{latenessLabel(task.deadline, task.completedAt)}</span></p>
+              <p className="text-xs text-ink-2">Completed {fmtDateTime(task.completedAt, now)}{(() => { const by = task.completedBy ? umap.get(task.completedBy) : null; return by ? <> by <Link href={personHref(by.id)} className="font-medium hover:underline">{by.name}</Link></> : null; })()} · <span className={h === "done_late" ? "text-critical-text font-semibold" : "text-good-text font-semibold"}>{latenessLabel(task.deadline, task.completedAt)}</span></p>
             )}
           </section>
 
@@ -165,7 +166,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
             {pending ? (
               <div className="rounded-xl border border-accent/40 bg-accent-soft p-3 grid gap-2 text-xs">
                 <div className="flex items-center gap-1.5 font-semibold text-accent-deep"><Hourglass className="size-3.5" />Waiting for approval</div>
-                <div className="text-ink-2"><span className="font-semibold text-ink">{requester?.name ?? "Someone"}</span> asked {timeAgo(pending.createdAt, now)} · {shiftLabel(task.deadline, pending.newDeadline)}</div>
+                <div className="text-ink-2">{requester ? <Link href={personHref(requester.id)} className="font-semibold text-ink hover:underline">{requester.name}</Link> : <span className="font-semibold text-ink">Someone</span>} asked {timeAgo(pending.createdAt, now)} · {shiftLabel(task.deadline, pending.newDeadline)}</div>
                 <div className="font-semibold text-ink">{fmtShortDateTime(task.deadline)} → {fmtShortDateTime(pending.newDeadline)}</div>
                 <div className="rounded-md bg-surface px-2 py-1 text-ink-2">“{pending.reason}”</div>
                 <div className="text-ink-3">The current deadline counts until {canDecide ? "you decide" : `${waitingOn} decides`}.</div>
@@ -180,7 +181,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
                   const who = umap.get(d.changedBy);
                   return (
                     <li key={d.id} className="text-xs">
-                      <div className="flex items-center gap-1.5 text-ink-2">{who && <Avatar user={who} size="xs" />}<span className="font-semibold">{who?.name ?? "Someone"}</span><span className="text-ink-3">{shiftLabel(d.oldDeadline, d.newDeadline)} · {timeAgo(d.createdAt, now)}{d.approvedBy && d.approvedBy !== d.changedBy ? ` · approved by ${umap.get(d.approvedBy)?.name.split(" ")[0] ?? "admin"}` : ""}</span></div>
+                      <div className="flex items-center gap-1.5 text-ink-2">{who ? <PersonLink user={who} size="xs" nameClassName="text-xs font-semibold text-ink-2" /> : <span className="font-semibold">Someone</span>}<span className="text-ink-3">{shiftLabel(d.oldDeadline, d.newDeadline)} · {timeAgo(d.createdAt, now)}{d.approvedBy && d.approvedBy !== d.changedBy ? ` · approved by ${umap.get(d.approvedBy)?.name.split(" ")[0] ?? "admin"}` : ""}</span></div>
                       <div className="mt-0.5 text-ink-3">{fmtShortDateTime(d.oldDeadline)} → {fmtShortDateTime(d.newDeadline)}</div>
                       <div className="mt-1 rounded-md bg-warn-soft text-warn-text px-2 py-1">“{d.reason}”</div>
                     </li>
@@ -197,15 +198,18 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
             </div>
             <ul className="grid gap-2">
               {owners.map((u) => (
-                <li key={u.id} className="flex items-center gap-2.5">
-                  <Avatar user={u} size="sm" />
-                  <span className="min-w-0"><span className="block text-sm font-medium truncate">{u.name}{u.id === user.id ? " (you)" : ""}</span><span className="block text-[11px] text-ink-3 truncate">{u.title || (u.role === "admin" ? "Admin" : "Member")}</span></span>
+                <li key={u.id}>
+                  <Link href={personHref(u.id)} className="flex items-center gap-2.5 rounded-lg -mx-1.5 px-1.5 py-1 hover:bg-surface-2 transition" title={`${u.name}'s page`}>
+                    <Avatar user={u} size="sm" />
+                    <span className="min-w-0"><span className="block text-sm font-medium truncate">{u.name}{u.id === user.id ? " (you)" : ""}</span><span className="block text-[11px] text-ink-3 truncate">{u.title || (u.role === "admin" ? "Admin" : "Member")}</span></span>
+                    <LinkSpinner className="ml-auto" />
+                  </Link>
                 </li>
               ))}
             </ul>
             <dl className="grid grid-cols-2 gap-2 text-xs border-t border-line pt-3">
               <div><dt className="text-ink-3">Priority</dt><dd className="font-semibold">{PRIORITY_LABEL[task.priority]}</dd></div>
-              <div><dt className="text-ink-3">Created</dt><dd className="font-semibold">{timeAgo(task.createdAt, now)}{creator ? ` by ${creator.name.split(" ")[0]}` : ""}</dd></div>
+              <div><dt className="text-ink-3">Created</dt><dd className="font-semibold">{timeAgo(task.createdAt, now)}{creator ? <> by <Link href={personHref(creator.id)} className="hover:underline">{creator.name.split(" ")[0]}</Link></> : ""}</dd></div>
             </dl>
           </section>
 
@@ -218,7 +222,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
                 return (
                   <li key={a.id} className="relative pl-5 text-xs">
                     <span className={`absolute left-0 top-1.5 size-2.5 rounded-full ${tone}`} aria-hidden />
-                    <div className="text-ink-2 leading-relaxed"><span className="font-semibold text-ink">{u?.name.split(" ")[0] ?? "Someone"}</span> {a.detail}</div>
+                    <div className="text-ink-2 leading-relaxed">{u ? <Link href={personHref(u.id)} className="font-semibold text-ink hover:underline">{u.name.split(" ")[0]}</Link> : <span className="font-semibold text-ink">Someone</span>} {a.detail}</div>
                     <div className="text-ink-3 mt-0.5">{fmtDateTime(a.createdAt, now)}</div>
                   </li>
                 );

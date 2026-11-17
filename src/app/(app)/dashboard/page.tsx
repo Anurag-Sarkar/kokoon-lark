@@ -19,6 +19,7 @@ export default async function DashboardPage() {
   const now = new Date();
   const [users, tasks, teams] = await Promise.all([listUsers(), listAllTasks(), listTeams()]);
   const umap = userMap(users);
+  const titles = new Map(tasks.map((t) => [t.id, t.title]));
   const stats = computeUserStats(user.id, tasks, now);
   const mine = tasks.filter((t) => t.assignees.includes(user.id));
 
@@ -81,10 +82,10 @@ export default async function DashboardPage() {
 
       <section>
         <SectionTitle hint="Everything assigned to you" action={<Link href="/tasks?scope=mine" className="text-xs font-semibold text-accent-deep hover:underline">Open task list →</Link>}>Your tasks</SectionTitle>
-        <TaskGroups tasks={mine} users={umap} now={now} />
+        <TaskGroups tasks={mine} users={umap} now={now} titles={titles} />
       </section>
 
-      <TeamPulse people={people} currentUserId={user.id} linkToAdmin={user.role === "admin"} hint={pulseHint} />
+      <TeamPulse people={people} currentUserId={user.id} hint={pulseHint} />
     </div>
   );
 }
