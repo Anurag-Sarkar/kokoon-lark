@@ -8,7 +8,7 @@ import { activeFlag } from "@/lib/integrity";
 import type { TaskDTO, UserDTO } from "@/lib/types";
 import { OwnerList } from "@/components/ui/Avatar";
 import { LinkSpinner } from "@/components/ui/LinkPending";
-import { HealthPill, PriorityMark, StatusPill, Tag } from "@/components/ui/Pills";
+import { DependencyPill, HealthPill, PriorityMark, StatusPill, Tag } from "@/components/ui/Pills";
 
 /**
  * One task in a list. The whole row is clickable through a stretched link underneath, so the owner
@@ -29,12 +29,15 @@ export function TaskRow({ task, users, now, showOwners = true, parentTitle }: { 
       </Link>
       <PriorityMark priority={task.priority} />
       <div className="min-w-0">
-        <div className={`text-sm font-medium truncate ${isDone ? "text-ink-2" : ""}`}>{task.title}</div>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className={`text-sm font-medium truncate ${isDone ? "text-ink-2" : ""}`}>{task.title}</span>
+          {task.parentId && <DependencyPill />}
+        </div>
         <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-ink-3">
           <span className={h === "overdue" ? "text-critical-text font-semibold" : h === "due_soon" ? "text-warn-text font-semibold" : ""}>{deadlineText}</span>
           {task.deadlineChanges.length > 0 && <span>· moved {task.deadlineChanges.length}×</span>}
           {pendingDeadlineRequest(task) && <span className="text-accent-deep font-semibold">· change pending approval</span>}
-          {task.parentId && <span className="inline-flex max-w-[260px] min-w-0">· dependency{parentTitle ? <>&nbsp;of&nbsp;<span className="truncate text-ink-2">{parentTitle}</span></> : ""}</span>}
+          {task.parentId && parentTitle && <span className="inline-flex max-w-[260px] min-w-0">· feeds&nbsp;<span className="truncate text-ink-2">{parentTitle}</span></span>}
           {activeFlag(task) && <span className="text-critical-text font-semibold">· flagged</span>}
           {task.tags.slice(0, 3).map((t) => <Tag key={t}>{t}</Tag>)}
           {showOwners && <span className="sm:hidden basis-full text-ink-2">{owners.length ? owners.map((u) => u.name).join(", ") : "Unassigned"}</span>}

@@ -4,7 +4,7 @@ import { ArrowLeft, CalendarClock, GitBranch, History, Hourglass, MessageSquare,
 import { requireUser } from "@/lib/auth";
 import { getTask, listChildTasks, listTeams, listUsers, userMap } from "@/lib/queries";
 import { activeFlag, canFlag } from "@/lib/integrity";
-import { AddDependencyButton, ClearFlagButton, FlagButton } from "@/components/tasks/Dependencies";
+import { AddDependencyButton, ClearFlagButton, EditDependencyButton, FlagButton } from "@/components/tasks/Dependencies";
 import { Avatar, OwnerList, PersonLink, personHref } from "@/components/ui/Avatar";
 import { LinkSpinner } from "@/components/ui/LinkPending";
 import { taskHealth } from "@/lib/stats";
@@ -66,7 +66,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
                   {moved && <span className="pill bg-warn-soft text-warn-text"><CalendarClock className="size-3.5" />Deadline moved {task.deadlineChanges.length}×</span>}
                   {pending && <span className="pill bg-accent-soft text-accent-deep"><Hourglass className="size-3.5" />Deadline change pending</span>}
                   {flag && <span className="pill bg-critical-soft text-critical-text"><ShieldAlert className="size-3.5" />Flagged: marked done but wasn't</span>}
-                  {parent && <Link href={`/tasks/${parent.id}`} className="pill bg-surface-2 text-ink-2 border border-line hover:border-line-2"><GitBranch className="size-3.5" />Dependency of: {parent.title}</Link>}
+                  {parent && <Link href={`/tasks/${parent.id}`} className="pill bg-violet-soft text-violet hover:underline" title="This task exists because another task is waiting on it"><GitBranch className="size-3.5" />Dependency · feeds {parent.title}</Link>}
                 </div>
                 <h1 className="text-2xl font-semibold tracking-tight leading-tight">{task.title}</h1>
                 {task.description ? <p className="mt-3 text-sm text-ink-2 leading-relaxed whitespace-pre-wrap">{task.description}</p> : <p className="mt-3 text-sm text-ink-3 italic">No description.</p>}
@@ -94,6 +94,8 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
                   const cd = deadlineDistance(c.deadline, now);
                   const cOwners = c.assignees.map((a) => umap.get(a)).filter((u): u is UserDTO => !!u);
                   const cFlag = activeFlag(c);
+                  const cPending = pendingDeadlineRequest(c);
+                  const cEditable = user.role === "admin" || c.createdBy === user.id || c.assignees.includes(user.id);
                   return (
                     <li key={c.id} className="row-link relative grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-1 rounded-lg px-3 py-2 border border-line hover:border-line-2">
                       <Link href={`/tasks/${c.id}`} className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-accent" aria-label={c.title}>
@@ -104,10 +106,14 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
                           <span className={`block text-[11px] ${ch === "overdue" ? "text-critical-text font-semibold" : ch === "due_soon" ? "text-warn-text font-semibold" : "text-ink-3"}`}>
                             {c.status === "done" && c.completedAt ? `Done · ${latenessLabel(c.deadline, c.completedAt)}` : `${fmtDateTime(c.deadline, now)} · ${cd.label}`}
                             {cFlag ? " · flagged" : ""}
+                            {cPending ? " · change pending approval" : ""}
                           </span>
                         </span>
                         <span className="hidden sm:flex justify-end max-w-[220px]"><OwnerList users={cOwners} size="xs" className="justify-end" /></span>
-                        <span className="justify-self-end">{c.status === "done" ? <HealthPill health={ch} /> : ch === "on_track" ? <StatusPill status={c.status} /> : <HealthPill health={ch} label={cd.label} />}</span>
+                        <span className="justify-self-end inline-flex items-center gap-1.5">
+                          {c.status === "done" ? <HealthPill health={ch} /> : ch === "on_track" ? <StatusPill status={c.status} /> : <HealthPill health={ch} label={cd.label} />}
+                          {cEditable && c.status !== "done" && <span className="relative z-10"><EditDependencyButton task={c} parent={task} users={activeUsers} currentUserId={user.id} direct={direct} /></span>}
+                        </span>
                     </li>
                   );
                 })}

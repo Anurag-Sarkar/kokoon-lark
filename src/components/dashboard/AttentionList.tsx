@@ -5,7 +5,7 @@ import { deadlineDistance, fmtDateTime } from "@/lib/format";
 import type { TaskDTO, UserDTO } from "@/lib/types";
 import { OwnerList } from "@/components/ui/Avatar";
 import { LinkSpinner } from "@/components/ui/LinkPending";
-import { HealthPill, PriorityMark } from "@/components/ui/Pills";
+import { DependencyPill, HealthPill, PriorityMark } from "@/components/ui/Pills";
 import { EmptyState } from "@/components/shell/PageHeader";
 
 export function AttentionList({ tasks, users, now, title = "Needs your attention", limit = 6 }: { tasks: TaskDTO[]; users: Map<string, UserDTO>; now: Date; title?: string; limit?: number }) {
@@ -37,7 +37,7 @@ export function AttentionList({ tasks, users, now, title = "Needs your attention
                 </Link>
                 <PriorityMark priority={t.priority} />
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium line-clamp-2 leading-snug">{t.title}</div>
+                  <div className="text-sm font-medium line-clamp-2 leading-snug">{t.title}{t.parentId && <DependencyPill className="ml-1.5 align-middle" />}</div>
                   <div className="text-[11px] text-ink-3">{fmtDateTime(t.deadline, now)}</div>
                 </div>
                 <OwnerList users={owners} size="xs" className="hidden sm:inline-flex max-w-[220px] justify-end" />

@@ -117,6 +117,7 @@ export type ActivityType =
   | "assignees"
   | "edited"
   | "subtask_added"
+  | "subtask_edited"
   | "subtask_done"
   | "subtask_reopened"
   | "subtask_removed"

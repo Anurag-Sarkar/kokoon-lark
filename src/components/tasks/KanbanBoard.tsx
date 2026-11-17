@@ -8,7 +8,7 @@ import { STATUSES, STATUS_LABEL, type Priority, type Status } from "@/lib/types"
 import { useAction } from "@/components/useAction";
 import { OwnerList } from "@/components/ui/Avatar";
 import { LinkSpinner } from "@/components/ui/LinkPending";
-import { PriorityMark } from "@/components/ui/Pills";
+import { DependencyPill, PriorityMark } from "@/components/ui/Pills";
 
 export interface KanbanCard {
   id: string;
@@ -90,7 +90,7 @@ export function KanbanBoard({ cards: initial, columns = STATUSES, doneLabel }: {
                         <div className={`mt-1 text-[11px] font-medium ${TONE[c.deadlineTone]}`}>{c.deadlineLabel}</div>
                         {c.pendingDeadline && <div className="mt-0.5 text-[11px] font-semibold text-accent-deep">Deadline change pending approval</div>}
                         {c.flagged && <div className="mt-0.5 text-[11px] font-semibold text-critical-text">Flagged: marked done but wasn't</div>}
-                        {c.dependency && <div className="mt-0.5 text-[11px] text-ink-3 truncate" title={c.parentTitle}>{c.parentTitle ? `Feeds: ${c.parentTitle}` : "Dependency for another task"}</div>}
+                        {c.dependency && <div className="mt-1 flex items-center gap-1.5 min-w-0"><DependencyPill />{c.parentTitle && <span className="text-[11px] text-ink-3 truncate" title={c.parentTitle}>feeds {c.parentTitle}</span>}</div>}
                       </div>
                       <PriorityMark priority={c.priority} />
                     </div>

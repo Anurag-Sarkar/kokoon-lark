@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, Clock, Flame, Minus, TimerOff, TrendingDown, TrendingUp, Zap, Moon, Circle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, Flame, GitBranch, Minus, TimerOff, TrendingDown, TrendingUp, Zap, Moon, Circle } from "lucide-react";
 import { HEALTH_LABEL, LEVEL_META, type Level, type TaskHealth } from "@/lib/stats";
 import { PRIORITY_LABEL, STATUS_LABEL, type Priority, type Status } from "@/lib/types";
 
@@ -67,6 +67,15 @@ export function PriorityMark({ priority, withLabel = false }: { priority: Priori
         </span>
       )}
       {withLabel && <span className="text-xs font-semibold">{PRIORITY_LABEL[priority]}</span>}
+    </span>
+  );
+}
+
+/** Marks a task that exists because another task is waiting on it. It is still an ordinary task for its owner. */
+export function DependencyPill({ size = "sm", className = "" }: { size?: "sm" | "md"; className?: string }) {
+  return (
+    <span className={`inline-flex shrink-0 items-center gap-1 rounded-md bg-violet-soft text-violet font-semibold whitespace-nowrap ${size === "sm" ? "h-5 px-1.5 text-[10px]" : "h-6 px-2 text-xs"} ${className}`} title="A dependency: another task is waiting on this one">
+      <GitBranch className={size === "sm" ? "size-3" : "size-3.5"} />Dependency
     </span>
   );
 }

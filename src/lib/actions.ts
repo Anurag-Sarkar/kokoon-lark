@@ -411,6 +411,24 @@ export async function toggleSubtask(taskId: string, subtaskId: string, done: boo
   return { ok: true };
 }
 
+export async function renameSubtask(taskId: string, subtaskId: string, title: string): Promise<ActionResult> {
+  const user = await requireActor();
+  const task = await loadEditableTask(taskId, user);
+  if (typeof task === "string") return fail(task);
+  const t = title.trim();
+  if (!t) return fail("Subtask needs a title.");
+  if (t.length > 200) return fail("Subtask title is too long (200 characters max).");
+  const sub = task.subtasks.find((s) => s._id.toString() === subtaskId);
+  if (!sub) return fail("Subtask not found.");
+  if (sub.title === t) return { ok: true };
+  await Task.updateOne(
+    { _id: task._id, "subtasks._id": sub._id },
+    { $set: { "subtasks.$.title": t }, $push: { activity: activity(user.id, "subtask_edited", `Renamed subtask "${sub.title}" to "${t}".`) } }
+  );
+  revalidateAll();
+  return { ok: true };
+}
+
 export async function removeSubtask(taskId: string, subtaskId: string): Promise<ActionResult> {
   const user = await requireActor();
   const task = await loadEditableTask(taskId, user);

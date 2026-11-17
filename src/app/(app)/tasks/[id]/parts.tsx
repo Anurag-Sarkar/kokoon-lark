@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CalendarClock, Check, Pencil, Plus, Trash2, Users, X } from "lucide-react";
-import { addComment, addSubtask, changeDeadline, deleteTask, removeSubtask, setAssignees, setTaskStatus, toggleSubtask, updateTaskDetails } from "@/lib/actions";
+import { addComment, addSubtask, changeDeadline, deleteTask, removeSubtask, renameSubtask, setAssignees, setTaskStatus, toggleSubtask, updateTaskDetails } from "@/lib/actions";
 import { toDatetimeLocal } from "@/lib/format";
 import { PRIORITIES, PRIORITY_LABEL, STATUSES, STATUS_LABEL, type Priority, type Status, type SubtaskDTO, type TaskDTO, type UserDTO } from "@/lib/types";
 import { useAction } from "@/components/useAction";
@@ -116,6 +116,7 @@ export function AssigneeEditor({ task, users, canEdit, currentUserId }: { task: 
 
 export function SubtaskList({ task, subtasks, users, canEdit }: { task: TaskDTO; subtasks: SubtaskDTO[]; users: UserDTO[]; canEdit: boolean }) {
   const [title, setTitle] = useState("");
+  const [editing, setEditing] = useState<{ id: string; title: string } | null>(null);
   const { run, pending, error } = useAction();
   const done = subtasks.filter((s) => s.isDone).length;
   const pctv = subtasks.length ? Math.round((done / subtasks.length) * 100) : 0;
@@ -131,12 +132,28 @@ export function SubtaskList({ task, subtasks, users, canEdit }: { task: TaskDTO;
       <ul className="grid gap-1">
         {subtasks.map((s) => {
           const who = s.completedBy ? byId.get(s.completedBy) : null;
+          if (editing?.id === s.id) {
+            return (
+              <li key={s.id} className="rounded-lg px-2 py-1.5 bg-surface-2">
+                <form className="flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); if (!editing.title.trim()) return; run(() => renameSubtask(task.id, s.id, editing.title), () => setEditing(null)); }}>
+                  <input value={editing.title} onChange={(e) => setEditing({ id: s.id, title: e.target.value })} onKeyDown={(e) => { if (e.key === "Escape") setEditing(null); }} className="input h-9" aria-label="Subtask title" maxLength={200} autoFocus />
+                  <button type="submit" className="btn btn-secondary btn-sm" disabled={pending || !editing.title.trim()}><Check className="size-3.5" />Save</button>
+                  <button type="button" className="btn btn-ghost btn-sm px-2" onClick={() => setEditing(null)} aria-label="Cancel"><X className="size-4" /></button>
+                </form>
+              </li>
+            );
+          }
           return (
             <li key={s.id} className="group flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-surface-2">
               <input type="checkbox" checked={s.isDone} disabled={!canEdit || pending} onChange={(e) => run(() => toggleSubtask(task.id, s.id, e.target.checked))} className="accent-ink size-4" aria-label={s.title} />
               <span className={`flex-1 text-sm ${s.isDone ? "line-through text-ink-3" : ""}`}>{s.title}</span>
               {who && <Link href={personHref(who.id)} className="shrink-0" title={`Done by ${who.name}`}><Avatar user={who} size="xs" /></Link>}
-              {canEdit && <button type="button" onClick={() => run(() => removeSubtask(task.id, s.id))} className="btn btn-ghost btn-xs px-1 opacity-0 group-hover:opacity-100" aria-label="Remove subtask"><Trash2 className="size-3.5" /></button>}
+              {canEdit && (
+                <span className="inline-flex items-center sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+                  <button type="button" onClick={() => setEditing({ id: s.id, title: s.title })} className="btn btn-ghost btn-xs px-1" aria-label="Edit subtask"><Pencil className="size-3.5" /></button>
+                  <button type="button" onClick={() => run(() => removeSubtask(task.id, s.id))} className="btn btn-ghost btn-xs px-1" aria-label="Remove subtask"><Trash2 className="size-3.5" /></button>
+                </span>
+              )}
             </li>
           );
         })}

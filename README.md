@@ -32,7 +32,8 @@ Production: `npm run build && npm start`. Set `MONGODB_URI` (and the email varia
 **Tasks**
 - Title, description, priority, tags, a required deadline, and one or more owners.
 - Status flow: To do → In progress → In review → Done. Completion time is recorded.
-- Subtasks with a progress bar, comments, and a full activity timeline.
+- Subtasks with a progress bar (rename or remove any of them), comments, and a full activity timeline.
+- Works as an installed app on a phone: dialogs become bottom sheets that scroll, so their buttons are always reachable, and whenever the app comes back to the foreground it re-fetches the page so new or finished tasks appear without a reload.
 - List view grouped by Overdue / Due today / This week / Later / Completed, plus a drag-and-drop board.
 - Owners are always shown by full name, never just initials.
 - Completed tasks stay out of the way: the board and list hide them until you turn on **Completed**, and then show only the current week. Admins can switch to a single day and step back through earlier days or weeks. When the current view is hiding finished tasks, a line under it says how many and offers *Show completed*.
@@ -50,7 +51,8 @@ Production: `npm run build && npm start`. Set `MONGODB_URI` (and the email varia
 - Every name and avatar in the app links to that person's page (`/people/<id>`): their score, open and overdue counts, what needs their attention and their tasks. Admins see the full picture (plus flags and deadline changes); members see it for themselves and their teammates, the same people as on their Team pulse, and for anyone else only the work they share.
 
 **Dependencies**
-- A task can depend on work from other people. From the task page, *Add dependency* creates a real task for them with its own deadline (on or before the parent's), linked back to the task it feeds. It shows up in their list, board and dashboard like any task and counts in their ownership score the same way, so a late dependency costs its owner, not the person waiting on it.
+- A task can depend on work from other people. From the task page, *Add dependency* creates a real task for them with its own deadline (on or before the parent's), linked back to the task it feeds. It shows up in their list, board and dashboard like any task, wearing a **Dependency** tag, and counts in their ownership score the same way, so a late dependency costs its owner, not the person waiting on it.
+- From the parent, *Edit* on a dependency changes its title, details and owners, and its deadline with a reason, under the same approval rules as any deadline change.
 - The parent shows its dependencies with status and health, and a "still open" warning next to Mark done. In lists and on the board, a dependency says which task it feeds. Deleting a parent leaves its dependencies as ordinary tasks.
 - Deadlines stay consistent: a dependency can't be moved past the task it feeds, and a task can't be pulled in before an open dependency. Both are checked when a change is made or requested, and again when a request is approved.
 
