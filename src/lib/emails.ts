@@ -149,3 +149,20 @@ export function flaggedEmail(p: { name: string; byName: string; taskTitle: strin
     ),
   };
 }
+
+export function reminderEmail(p: { name: string; taskTitle: string; kind: "48h" | "today"; past: boolean; whenLabel: string; link: string }): MailContent {
+  const first = p.name.split(" ")[0];
+  const heading = p.kind === "48h" ? "Due in 2 days" : "Due today";
+  const line = p.past ? `was due ${p.whenLabel} and is still open` : `is due ${p.whenLabel}`;
+  const advice = "If the date can't hold, ask for a deadline change on the task rather than letting it slip.";
+  return {
+    subject: `${heading}: ${p.taskTitle}`,
+    text: `Hi ${first},\n\n"${p.taskTitle}" ${line}.\n\n${advice}\n\nOpen it: ${p.link}\n\nYou can turn these emails off under Account in Kokoon Task.`,
+    html: layout(
+      heading,
+      [`Hi ${esc(first)},`, `<strong>${esc(p.taskTitle)}</strong> ${esc(line)}.`, esc(advice)],
+      { href: p.link, label: "Open the task" },
+      "You can turn these emails off under Account in Kokoon Task."
+    ),
+  };
+}

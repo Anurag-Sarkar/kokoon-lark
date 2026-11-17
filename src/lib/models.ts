@@ -101,6 +101,16 @@ export interface FlagDoc {
   clearNote: string;
 }
 
+export type ReminderKind = "48h" | "today";
+
+/** A deadline reminder that went out, keyed by the deadline it was for so a moved deadline gets fresh ones. */
+export interface ReminderDoc {
+  kind: ReminderKind;
+  deadline: Date;
+  sentAt: Date;
+  to: Types.ObjectId[];
+}
+
 export interface CommentDoc {
   _id: Types.ObjectId;
   userId: Types.ObjectId;
@@ -134,6 +144,7 @@ export interface TaskDoc {
   deadlineChanges: DeadlineChangeDoc[];
   deadlineRequests: DeadlineRequestDoc[];
   flags: FlagDoc[];
+  reminders: ReminderDoc[];
   comments: CommentDoc[];
   activity: ActivityDoc[];
   createdAt: Date;
@@ -242,6 +253,16 @@ const FlagSchema = new Schema<FlagDoc>({
   clearNote: { type: String, default: "" },
 });
 
+const ReminderSchema = new Schema<ReminderDoc>(
+  {
+    kind: { type: String, enum: ["48h", "today"], required: true },
+    deadline: { type: Date, required: true },
+    sentAt: { type: Date, required: true },
+    to: [{ type: Schema.Types.ObjectId, ref: "User" }],
+  },
+  { _id: false }
+);
+
 const CommentSchema = new Schema<CommentDoc>({
   userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
   body: { type: String, required: true, trim: true },
@@ -281,6 +302,7 @@ const TaskSchema = new Schema<TaskDoc>(
     deadlineChanges: [DeadlineChangeSchema],
     deadlineRequests: [DeadlineRequestSchema],
     flags: [FlagSchema],
+    reminders: [ReminderSchema],
     comments: [CommentSchema],
     activity: [ActivitySchema],
   },

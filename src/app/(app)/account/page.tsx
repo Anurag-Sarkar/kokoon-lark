@@ -47,7 +47,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         <section className="card p-5 grid gap-5">
           <div>
             <h2 className="text-sm font-semibold mb-1">Email notifications</h2>
-            <p className="text-xs text-ink-3 mb-3">Get an email when a task is assigned to you, when a deadline change needs your approval, or when yours is decided. Invites and password emails are always sent.</p>
+            <p className="text-xs text-ink-3 mb-3">Get an email when a task is assigned to you, when a deadline change needs your approval or yours is decided, and as a reminder two days before and on the morning a task of yours is due. Invites and password emails are always sent.</p>
             <NotificationsToggle enabled={user.emailNotifications} />
           </div>
           <div className="border-t border-line pt-5">
