@@ -1,4 +1,4 @@
-import { Loading, Skeleton, SkeletonHeader, SkeletonRows } from "@/components/ui/Skeleton";
+import { Loading, Skeleton, SkeletonHeader, TasksListSkeleton } from "@/components/ui/Skeleton";
 
 export default function TasksLoading() {
   return (
@@ -11,11 +11,7 @@ export default function TasksLoading() {
         <Skeleton className="h-9 w-28 rounded-[10px]" />
         <Skeleton className="h-9 w-28 rounded-[10px] ml-auto" />
       </div>
-      <div className="grid gap-4">
-        <SkeletonRows n={3} />
-        <SkeletonRows n={4} />
-        <SkeletonRows n={2} />
-      </div>
+      <TasksListSkeleton />
     </Loading>
   );
 }

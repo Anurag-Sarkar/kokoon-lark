@@ -39,7 +39,8 @@ Production: `npm run build && npm start`. Set `MONGODB_URI` (and the email varia
 - Completed tasks stay out of the way: the board and list hide them until you turn on **Completed**, and then show only the current week. Admins can switch to a single day and step back through earlier days or weeks. When the current view is hiding finished tasks, a line under it says how many and offers *Show completed*.
 - Feels instant on a slow connection: every page has a skeleton that appears the moment you tap a link, sidebar items, rows and cards show a spinner while they load, and the filter bar shows one while results update.
 - The new-task form keeps what you typed if something is missing, and the Create button only enables once there is a title, a deadline and at least one owner.
-- Search and filters by status, priority and owner. Scope is **My tasks** / **My team** for members and **My tasks** / **Team** / **Everyone** for admins.
+- Search and filters by status, priority and owner. Scope is **My tasks** / **My team** for members and **My tasks** / **Team** / **Everyone** for admins. *My tasks* is the work assigned to you; tasks you created for other people show under Team / Everyone and on the task they feed.
+- Changing any filter, the scope, the period or the list/board switch swaps the list for a skeleton at once, so a tap on a slow connection is never in doubt.
 
 **Teams**
 - Admins create teams, pick a colour, choose a **team owner**, and add or remove people (also from the add-person form). Member and owner pickers are searchable.

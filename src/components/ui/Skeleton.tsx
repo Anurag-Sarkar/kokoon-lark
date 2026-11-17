@@ -1,6 +1,7 @@
 /* Grey placeholder blocks shown while a page's data loads (each route's loading.tsx composes these). */
 
-export function Skeleton({ className = "" }: { className?: string }) {
+export function Skeleton({ className = "", inline = false }: { className?: string; /** renders a span, for use inside text and <p> */ inline?: boolean }) {
+  if (inline) return <span className={`inline-block animate-pulse rounded-md bg-line ${className}`} aria-hidden />;
   return <div className={`animate-pulse rounded-md bg-line ${className}`} aria-hidden />;
 }
 
@@ -73,6 +74,43 @@ export function Loading({ children, label = "Loading" }: { children: React.React
       <span className="sr-only">{label}…</span>
       {children}
     </div>
+  );
+}
+
+/** The task list: a few groups of rows. Shown while filters, scope or period change. */
+export function TasksListSkeleton() {
+  return (
+    <Loading label="Loading tasks">
+      <div className="grid gap-4">
+        <SkeletonRows n={3} />
+        <SkeletonRows n={4} />
+        <SkeletonRows n={2} />
+      </div>
+    </Loading>
+  );
+}
+
+/** The board: columns of cards. */
+export function TasksBoardSkeleton({ columns = 3 }: { columns?: number }) {
+  return (
+    <Loading label="Loading board">
+      <div className={`grid grid-cols-1 md:grid-cols-2 ${columns >= 4 ? "xl:grid-cols-4" : "xl:grid-cols-3"} gap-3`}>
+        {Array.from({ length: columns }, (_, i) => (
+          <div key={i} className="rounded-2xl bg-surface-2 border border-line p-2.5">
+            <div className="flex items-center justify-between px-1.5 py-1 mb-2"><Skeleton className="h-3 w-20" /><Skeleton className="h-3 w-4" /></div>
+            <div className="grid gap-2">
+              {Array.from({ length: i === 0 ? 3 : 2 }, (_, j) => (
+                <div key={j} className="card p-3">
+                  <Skeleton className="h-4 w-5/6" />
+                  <Skeleton className="h-3 w-24 mt-2" />
+                  <div className="mt-3 flex items-center gap-1.5"><Skeleton className="size-5 rounded-full" /><Skeleton className="h-3 w-16" /></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Loading>
   );
 }
 
