@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CalendarClock, Check, Pencil, Plus, Trash2, Users, X } from "lucide-react";
 import { addComment, addSubtask, changeDeadline, deleteTask, removeSubtask, renameSubtask, setAssignees, setTaskStatus, toggleSubtask, updateTaskDetails } from "@/lib/actions";
-import { toDatetimeLocal } from "@/lib/format";
+import { localInputToIso, toDatetimeLocal } from "@/lib/format";
 import { PRIORITIES, PRIORITY_LABEL, STATUSES, STATUS_LABEL, type Priority, type Status, type SubtaskDTO, type TaskDTO, type UserDTO } from "@/lib/types";
 import { useAction } from "@/components/useAction";
 import { Modal } from "@/components/ui/Modal";
@@ -78,7 +78,7 @@ export function DeadlineChanger({ task, canEdit, direct, reviewerLabel, minDeadl
           <ErrorLine error={error} />
           <div className="flex justify-end gap-2">
             <button type="button" className="btn btn-secondary" onClick={() => setOpen(false)}>Cancel</button>
-            <button type="button" className="btn btn-primary" disabled={pending || reason.trim().length < 5} onClick={() => run(() => changeDeadline(task.id, value, reason), () => setOpen(false))}>
+            <button type="button" className="btn btn-primary" disabled={pending || reason.trim().length < 5} onClick={() => run(() => changeDeadline(task.id, localInputToIso(value), reason), () => setOpen(false))}>
               {pending ? "Saving…" : direct ? "Move deadline" : "Send for approval"}
             </button>
           </div>

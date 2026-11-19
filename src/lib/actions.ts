@@ -9,7 +9,7 @@ import { SESSION_COOKIE, destroySession, getCurrentUser, startSession } from "./
 import { INVITE_TTL_MS, issueToken } from "./tokens";
 import { appUrl, mailConfigured, sendMail } from "./mail";
 import { inviteEmail, tempPasswordEmail } from "./emails";
-import { notifyAssigned, notifyDeadlineDecision, notifyDeadlineRequest, notifyFlagged } from "./notify";
+import { notifyAssigned, notifyDeadlineDecision, notifyDeadlineRequest, notifyDependency, notifyFlagged } from "./notify";
 import { toTeamDTO, toUserDTO } from "./serialize";
 import { canReview, changesApplyDirectly, reviewerLabel, reviewersFor } from "./approvals";
 import { canFlag } from "./integrity";
@@ -519,7 +519,7 @@ export async function createDependency(
     { _id: parent._id },
     { $push: { activity: activity(user.id, "dependency_added", `Added dependency "${title}" for ${names.join(", ")}, due ${fmtShortDateTime(deadline.toISOString())}.`) } }
   );
-  await notifyAssigned(created, ids, user, names);
+  await notifyDependency(created, parent, ids, user, names);
   revalidateAll();
   return { ok: true, id: created._id.toString() };
 }

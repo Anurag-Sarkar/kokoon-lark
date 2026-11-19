@@ -2,7 +2,7 @@ import { Types } from "mongoose";
 import { connectDB } from "./mongodb";
 import { User, type TaskDoc } from "./models";
 import { appUrl, sendMail } from "./mail";
-import { assignedEmail, deadlineDecisionEmail, deadlineRequestEmail, flaggedEmail } from "./emails";
+import { assignedEmail, deadlineDecisionEmail, deadlineRequestEmail, dependencyEmail, flaggedEmail } from "./emails";
 import { fmtShortDateTime, shiftLabel } from "./format";
 import { PRIORITY_LABEL } from "./types";
 import { sendPush } from "./push";
@@ -45,6 +45,45 @@ export async function notifyAssigned(
     );
   } catch (err) {
     console.error("[notify] assignment emails failed:", err);
+  }
+}
+
+/** Tells the people a dependency was assigned to, naming the task that is waiting on them. Never throws. */
+export async function notifyDependency(
+  child: Pick<TaskDoc, "_id" | "title" | "deadline">,
+  parent: Pick<TaskDoc, "_id" | "title" | "deadline">,
+  assigneeIds: string[],
+  actor: { id: string; name: string },
+  allOwnerNames: string[]
+): Promise<void> {
+  const targets = assigneeIds.filter((id) => id !== actor.id);
+  if (targets.length === 0) return;
+  const path = `/tasks/${child._id.toString()}`;
+  const deadlineLabel = fmtShortDateTime(new Date(child.deadline).toISOString());
+  await sendPush(targets, {
+    title: `${actor.name} needs something from you`,
+    body: `${child.title} · needed by ${deadlineLabel} for "${parent.title}"`,
+    url: path,
+    tag: `task-${child._id.toString()}`,
+  });
+  try {
+    const users = await mailableUsers(targets, actor.id);
+    if (users.length === 0) return;
+    const link = `${await appUrl()}${path}`;
+    await Promise.allSettled(
+      users.map((u) =>
+        sendMail({
+          to: u.email,
+          ...dependencyEmail({
+            name: u.name, byName: actor.name, taskTitle: child.title, parentTitle: parent.title,
+            deadlineLabel, parentDeadlineLabel: fmtShortDateTime(new Date(parent.deadline).toISOString()),
+            link, coOwners: allOwnerNames.filter((n) => n !== u.name),
+          }),
+        })
+      )
+    );
+  } catch (err) {
+    console.error("[notify] dependency emails failed:", err);
   }
 }
 

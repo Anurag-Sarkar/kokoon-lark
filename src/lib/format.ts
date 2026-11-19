@@ -28,6 +28,16 @@ export function toDatetimeLocal(iso: string): string {
   return format(new Date(iso), "yyyy-MM-dd'T'HH:mm");
 }
 
+/**
+ * A datetime-local value ("2026-11-21T22:00") has no timezone. Converting it on the device that filled it
+ * pins the instant the person meant, whatever timezone the server runs in. Empty when the value is blank or invalid.
+ */
+export function localInputToIso(value: string): string {
+  if (!value) return "";
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? "" : d.toISOString();
+}
+
 export function timeAgo(iso: string, now = new Date()): string {
   const d = new Date(iso);
   const mins = differenceInMinutes(now, d);

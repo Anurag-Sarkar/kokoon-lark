@@ -1,5 +1,7 @@
 "use client";
 
+import { localInputToIso } from "@/lib/format";
+
 import { useActionState, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { createTask, type FormState } from "@/lib/actions";
@@ -54,7 +56,8 @@ export function NewTaskForm({ users, defaultDeadline, currentUserId }: { users: 
         <div className="card p-5 grid gap-4">
           <div>
             <label className="label" htmlFor="deadline">Deadline</label>
-            <input id="deadline" name="deadline" type="datetime-local" required value={deadline} onChange={(e) => setDeadline(e.target.value)} className="input" />
+            <input id="deadline" type="datetime-local" required value={deadline} onChange={(e) => setDeadline(e.target.value)} className="input" />
+            <input type="hidden" name="deadline" value={localInputToIso(deadline)} />
             <p className="mt-1 text-[11px] text-ink-3">Changing it later requires a reason, visible to everyone.</p>
           </div>
           <div>

@@ -80,10 +80,12 @@ export async function sendMail(msg: MailMessage): Promise<MailResult> {
         body: JSON.stringify({ from: fromAddress(), to: [msg.to], subject: msg.subject, text: msg.text, html: msg.html }),
       });
       if (!res.ok) return { ok: false, error: `Resend returned ${res.status}: ${(await res.text()).slice(0, 300)}` };
+      console.log(`[mail] Sent "${msg.subject}" to ${msg.to} via Resend`);
       return { ok: true, delivered: true };
     }
     if (provider === "smtp") {
       await smtpTransport().sendMail({ from: fromAddress(), to: msg.to, subject: msg.subject, text: msg.text, html: msg.html });
+      console.log(`[mail] Sent "${msg.subject}" to ${msg.to} via SMTP`);
       return { ok: true, delivered: true };
     }
     console.log(`\n[mail] Email not configured, so this was NOT sent.\n[mail] To: ${msg.to}\n[mail] Subject: ${msg.subject}\n${msg.text.split("\n").map((l) => `[mail] ${l}`).join("\n")}\n`);

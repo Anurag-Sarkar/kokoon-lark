@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { GitBranchPlus, Pencil, ShieldAlert, ShieldCheck } from "lucide-react";
 import { changeDeadline, clearFlag, createDependency, flagTask, setAssignees, updateTaskDetails } from "@/lib/actions";
-import { fmtShortDateTime, toDatetimeLocal } from "@/lib/format";
+import { fmtShortDateTime, localInputToIso, toDatetimeLocal } from "@/lib/format";
 import { pendingDeadlineRequest } from "@/lib/approvals";
 import type { ActionResult, TaskDTO, UserDTO } from "@/lib/types";
 import { useAction } from "@/components/useAction";
@@ -46,7 +46,7 @@ export function AddDependencyButton({ parent, users, currentUserId }: { parent: 
           <ErrorLine error={error} />
           <div className="flex justify-end gap-2">
             <button type="button" className="btn btn-secondary" onClick={() => setOpen(false)}>Cancel</button>
-            <button type="button" className="btn btn-primary" disabled={pending || !ready} onClick={() => run(() => createDependency(parent.id, { title, description, deadline, assigneeIds: owners }), () => setOpen(false))}>{pending ? "Adding…" : "Add dependency"}</button>
+            <button type="button" className="btn btn-primary" disabled={pending || !ready} onClick={() => run(() => createDependency(parent.id, { title, description, deadline: localInputToIso(deadline), assigneeIds: owners }), () => setOpen(false))}>{pending ? "Adding…" : "Add dependency"}</button>
           </div>
         </div>
       </Modal>
@@ -79,7 +79,7 @@ export function EditDependencyButton({ task, parent, users, currentUserId, direc
       if (detailsChanged) { const r = await updateTaskDetails(task.id, { title, description, priority: task.priority, tags: task.tags.join(", ") }); if (!r.ok) return r; }
       if (ownersChanged) { const r = await setAssignees(task.id, owners); if (!r.ok) return r; }
       if (deadlineChanged) {
-        const r = await changeDeadline(task.id, deadline, reason);
+        const r = await changeDeadline(task.id, localInputToIso(deadline), reason);
         if (!r.ok) return r;
         if (!r.applied) setNotice(`Saved. The new deadline is waiting for ${r.reviewers.join(", ") || "an admin"} to approve it; until then ${fmtShortDateTime(task.deadline)} still counts.`);
       }

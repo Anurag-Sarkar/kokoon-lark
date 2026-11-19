@@ -166,3 +166,23 @@ export function reminderEmail(p: { name: string; taskTitle: string; kind: "48h" 
     ),
   };
 }
+
+export function dependencyEmail(p: { name: string; byName: string; taskTitle: string; parentTitle: string; deadlineLabel: string; parentDeadlineLabel: string; link: string; coOwners: string[] }): MailContent {
+  const first = p.name.split(" ")[0];
+  const with_ = p.coOwners.length ? ` together with ${p.coOwners.join(", ")}` : "";
+  return {
+    subject: `${p.byName} needs something from you: ${p.taskTitle}`,
+    text: `Hi ${first},\n\n${p.byName} added "${p.taskTitle}" as a dependency of "${p.parentTitle}" and assigned it to you${with_}. Their task can't finish until yours is done.\n\nNeeded by: ${p.deadlineLabel}\n(${p.parentTitle} is due ${p.parentDeadlineLabel})\n\nIt's an ordinary task for you: it counts in your ownership score like any other, and it carries a Dependency tag.\n\nOpen it: ${p.link}\n\nYou can turn these emails off under Account in Kokoon Task.`,
+    html: layout(
+      `${esc(p.byName)} needs something from you`,
+      [
+        `Hi ${esc(first)},`,
+        `${esc(p.byName)} added <strong>${esc(p.taskTitle)}</strong> as a dependency of <strong>${esc(p.parentTitle)}</strong> and assigned it to you${esc(with_)}. Their task can't finish until yours is done.`,
+        `<span style="display:block;background:#f6f6f3;border-radius:10px;padding:12px 14px;font-size:14px">Needed by: <strong>${esc(p.deadlineLabel)}</strong><br><span style="color:#7a7a76">${esc(p.parentTitle)} is due ${esc(p.parentDeadlineLabel)}</span></span>`,
+        `It's an ordinary task for you: it counts in your ownership score like any other, and it carries a Dependency tag.`,
+      ],
+      { href: p.link, label: "Open the task" },
+      "You can turn these emails off under Account in Kokoon Task."
+    ),
+  };
+}

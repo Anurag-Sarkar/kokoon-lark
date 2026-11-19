@@ -13,6 +13,8 @@ import { AttentionList } from "@/components/dashboard/AttentionList";
 import { WeeklyCompletionsChart } from "@/components/charts/WeeklyCompletionsChart";
 import { StatTile } from "@/components/ui/StatTile";
 import { TaskGroups } from "@/components/tasks/TaskGroups";
+import { PushNudge } from "@/components/auth/PushNudge";
+import { pushConfigured } from "@/lib/push";
 
 export default async function DashboardPage() {
   const user = await requireUser();
@@ -43,6 +45,8 @@ export default async function DashboardPage() {
         subtitle={`${format(now, "EEEE, MMMM d")} · here's an honest look at your work.`}
         actions={<Link href="/tasks/new" className="btn btn-primary"><Plus className="size-4" />New task</Link>}
       />
+
+      <PushNudge configured={pushConfigured()} />
 
       {toReview > 0 && (
         <Link href="/approvals" className="card p-4 flex items-center gap-3 border-l-4 border-l-accent hover:border-line-2 transition">
