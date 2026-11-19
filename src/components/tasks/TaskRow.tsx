@@ -28,9 +28,9 @@ export function TaskStatePill({ task, now }: { task: TaskDTO; now: Date }) {
  * One task in a list. The whole row is clickable through a stretched link underneath, so the owner
  * chips can be links of their own without nesting anchors.
  *
- * Desktop columns: priority · title + details · subtasks · owner · state. The dependency tag sits
- * against the right edge of the title column, so it is in the same place on every row. On a phone
- * the row stacks: title, details, then owner and state on a footer line.
+ * Desktop columns: priority · title + details · subtasks · owner · state. The dependency tag leads
+ * the detail line under the title, so it starts at the same x on every row and stays attached to
+ * the text. On a phone the row stacks: title, details, then owner and state on a footer line.
  */
 export function TaskRow({ task, users, now, showOwners = true, parentTitle }: { task: TaskDTO; users: Map<string, UserDTO>; now: Date; showOwners?: boolean; /** title of the task this one feeds, when it is a dependency */ parentTitle?: string }) {
   const h = taskHealth(task, now);
@@ -48,12 +48,9 @@ export function TaskRow({ task, users, now, showOwners = true, parentTitle }: { 
       </Link>
       <span className="flex justify-center"><PriorityMark priority={task.priority} /></span>
       <div className="min-w-0">
-        <div className="flex items-center gap-3 min-w-0">
-          <span className={`text-sm font-medium truncate ${isDone ? "text-ink-2" : ""}`}>{task.title}</span>
-          {dependency && <DependencyPill className="hidden sm:inline-flex ml-auto" />}
-        </div>
+        <div className={`text-sm font-medium truncate ${isDone ? "text-ink-2" : ""}`}>{task.title}</div>
         <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-ink-3 leading-5">
-          {dependency && <DependencyPill className="sm:hidden" />}
+          {dependency && <DependencyPill />}
           <span className={h === "overdue" ? "text-critical-text font-semibold" : h === "due_soon" ? "text-warn-text font-semibold" : ""}>{deadlineText}</span>
           {task.deadlineChanges.length > 0 && <span>· moved {task.deadlineChanges.length}×</span>}
           {pendingDeadlineRequest(task) && <span className="text-accent-deep font-semibold">· change pending approval</span>}
