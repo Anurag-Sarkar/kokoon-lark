@@ -59,3 +59,36 @@ export function OwnerList({ users, size = "xs", className = "", emptyLabel = "Un
     </span>
   );
 }
+
+/**
+ * Owners in a fixed-width list column: the avatars stacked, then one name. Every row's owner then
+ * starts at the same place, however many people there are. Each avatar opens that person's page and
+ * the name opens the first owner's; the full list is in the tooltip.
+ */
+export function OwnerCell({ users, max = 3, emptyLabel = "Unassigned", className = "" }: { users: Person[]; max?: number; emptyLabel?: string; className?: string }) {
+  if (users.length === 0) return <span className={`text-[11px] text-ink-3 ${className}`}>{emptyLabel}</span>;
+  const shown = users.slice(0, max);
+  const first = users[0];
+  const label = users.length === 1 ? first.name : `${first.name.split(" ")[0]} +${users.length - 1}`;
+  const all = users.map((u) => u.name).join(", ");
+  return (
+    <span className={`inline-flex items-center gap-1.5 min-w-0 ${className}`} title={all}>
+      <span className="inline-flex shrink-0 items-center">
+        {shown.map((u, i) =>
+          u.id ? (
+            <Link key={u.id} href={personHref(u.id)} className={`relative z-10 inline-flex rounded-full ${i > 0 ? "-ml-1.5" : ""}`} title={`${u.name}'s page`}>
+              <Avatar user={u} size="xs" />
+            </Link>
+          ) : (
+            <Avatar key={`${u.name}-${i}`} user={u} size="xs" className={i > 0 ? "-ml-1.5" : ""} />
+          )
+        )}
+      </span>
+      {first.id ? (
+        <Link href={personHref(first.id)} className="relative z-10 min-w-0 truncate text-[11px] font-medium text-ink-2 hover:underline">{label}</Link>
+      ) : (
+        <span className="min-w-0 truncate text-[11px] font-medium text-ink-2">{label}</span>
+      )}
+    </span>
+  );
+}

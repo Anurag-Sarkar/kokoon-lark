@@ -5,7 +5,8 @@ import { requireUser } from "@/lib/auth";
 import { getTask, listChildTasks, listTeams, listUsers, userMap } from "@/lib/queries";
 import { activeFlag, canFlag } from "@/lib/integrity";
 import { AddDependencyButton, ClearFlagButton, EditDependencyButton, FlagButton } from "@/components/tasks/Dependencies";
-import { Avatar, OwnerList, PersonLink, personHref } from "@/components/ui/Avatar";
+import { Avatar, OwnerCell, PersonLink, personHref } from "@/components/ui/Avatar";
+import { TaskStatePill } from "@/components/tasks/TaskRow";
 import { LinkSpinner } from "@/components/ui/LinkPending";
 import { taskHealth } from "@/lib/stats";
 import { canReview, changesApplyDirectly, pendingDeadlineRequest, reviewerLabel, reviewersFor } from "@/lib/approvals";
@@ -97,7 +98,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
                   const cPending = pendingDeadlineRequest(c);
                   const cEditable = user.role === "admin" || c.createdBy === user.id || c.assignees.includes(user.id);
                   return (
-                    <li key={c.id} className="row-link relative grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-1 rounded-lg px-3 py-2 border border-line hover:border-line-2">
+                    <li key={c.id} className="row-link relative grid grid-cols-[minmax(0,1fr)] sm:grid-cols-[minmax(0,1fr)_10.5rem_8.25rem_2.25rem] items-center gap-x-3 rounded-lg px-3 py-2 border border-line hover:border-line-2">
                       <Link href={`/tasks/${c.id}`} className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-accent" aria-label={c.title}>
                         <LinkSpinner className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-surface" />
                       </Link>
@@ -108,10 +109,17 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
                             {cFlag ? " · flagged" : ""}
                             {cPending ? " · change pending approval" : ""}
                           </span>
+                          <span className="sm:hidden mt-1.5 flex items-center justify-between gap-3">
+                            <span className="min-w-0 truncate text-[11px] font-medium text-ink-2">{cOwners.length ? cOwners.map((u) => u.name).join(", ") : "Unassigned"}</span>
+                            <span className="inline-flex items-center gap-1.5 shrink-0">
+                              <TaskStatePill task={c} now={now} />
+                              {cEditable && c.status !== "done" && <span className="relative z-10"><EditDependencyButton task={c} parent={task} users={activeUsers} currentUserId={user.id} direct={direct} /></span>}
+                            </span>
+                          </span>
                         </span>
-                        <span className="hidden sm:flex justify-end max-w-[220px]"><OwnerList users={cOwners} size="xs" className="justify-end" /></span>
-                        <span className="justify-self-end inline-flex items-center gap-1.5">
-                          {c.status === "done" ? <HealthPill health={ch} /> : ch === "on_track" ? <StatusPill status={c.status} /> : <HealthPill health={ch} label={cd.label} />}
+                        <span className="hidden sm:flex min-w-0"><OwnerCell users={cOwners} /></span>
+                        <span className="hidden sm:flex"><TaskStatePill task={c} now={now} /></span>
+                        <span className="hidden sm:flex justify-end">
                           {cEditable && c.status !== "done" && <span className="relative z-10"><EditDependencyButton task={c} parent={task} users={activeUsers} currentUserId={user.id} direct={direct} /></span>}
                         </span>
                     </li>

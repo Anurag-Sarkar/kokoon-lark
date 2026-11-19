@@ -6,7 +6,7 @@ import { CheckCircle2, CheckSquare, GripVertical } from "lucide-react";
 import { setTaskStatus } from "@/lib/actions";
 import { STATUSES, STATUS_LABEL, type Priority, type Status } from "@/lib/types";
 import { useAction } from "@/components/useAction";
-import { OwnerList } from "@/components/ui/Avatar";
+import { OwnerCell } from "@/components/ui/Avatar";
 import { LinkSpinner } from "@/components/ui/LinkPending";
 import { DependencyPill, PriorityMark } from "@/components/ui/Pills";
 
@@ -81,7 +81,7 @@ export function KanbanBoard({ cards: initial, columns = STATUSES, doneLabel }: {
                     draggable={c.canEdit}
                     onDragStart={(e) => { setDragging(c.id); e.dataTransfer.setData("text/plain", c.id); e.dataTransfer.effectAllowed = "move"; }}
                     onDragEnd={() => setDragging(null)}
-                    className={`card p-3 ${c.canEdit ? "cursor-grab active:cursor-grabbing" : ""} ${dragging === c.id ? "opacity-50" : ""}`}
+                    className={`card min-w-0 p-3 ${c.canEdit ? "cursor-grab active:cursor-grabbing" : ""} ${dragging === c.id ? "opacity-50" : ""}`}
                   >
                     <div className="flex items-start gap-2">
                       {c.canEdit && <GripVertical className="size-4 text-line-2 shrink-0 mt-0.5" aria-hidden />}
@@ -94,8 +94,8 @@ export function KanbanBoard({ cards: initial, columns = STATUSES, doneLabel }: {
                       </div>
                       <PriorityMark priority={c.priority} />
                     </div>
-                    <div className="mt-2.5 flex items-end justify-between gap-2">
-                      <OwnerList users={c.owners} size="xs" className="min-w-0" />
+                    <div className="mt-2.5 flex items-center justify-between gap-2">
+                      <OwnerCell users={c.owners} />
                       <div className="flex items-center gap-2 shrink-0">
                         {c.subTotal > 0 && <span className="inline-flex items-center gap-1 text-[11px] text-ink-3 tnum"><CheckSquare className="size-3" />{c.subDone}/{c.subTotal}</span>}
                         {c.canEdit && (

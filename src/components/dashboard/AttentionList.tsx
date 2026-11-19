@@ -1,13 +1,12 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 import { taskHealth } from "@/lib/stats";
 import { deadlineDistance, fmtDateTime } from "@/lib/format";
 import type { TaskDTO, UserDTO } from "@/lib/types";
-import { OwnerList } from "@/components/ui/Avatar";
 import { LinkSpinner } from "@/components/ui/LinkPending";
 import { DependencyPill, HealthPill, PriorityMark } from "@/components/ui/Pills";
 import { EmptyState } from "@/components/shell/PageHeader";
 
+/** The person's overdue and due-soon tasks, as fixed-column rows so the state pills line up down the list. */
 export function AttentionList({ tasks, users, now, title = "Needs your attention", limit = 6 }: { tasks: TaskDTO[]; users: Map<string, UserDTO>; now: Date; title?: string; limit?: number }) {
   const hot = tasks
     .filter((t) => { const h = taskHealth(t, now); return h === "overdue" || h === "due_soon"; })
@@ -29,20 +28,20 @@ export function AttentionList({ tasks, users, now, title = "Needs your attention
           {shown.map((t) => {
             const h = taskHealth(t, now);
             const d = deadlineDistance(t.deadline, now);
-            const owners = t.assignees.map((id) => users.get(id)).filter((u): u is UserDTO => !!u);
             return (
-              <li key={t.id} className="row-link relative flex items-center gap-3 px-2 py-2.5 rounded-lg">
+              <li key={t.id} className="row-link relative grid grid-cols-[1rem_minmax(0,1fr)_auto] md:grid-cols-[1rem_minmax(0,1fr)_8.25rem] items-center gap-x-3 px-2 py-2.5 rounded-lg">
                 <Link href={`/tasks/${t.id}`} className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-accent" aria-label={t.title}>
-                  <LinkSpinner className="absolute right-7 top-1/2 -translate-y-1/2 rounded-full bg-surface" />
+                  <LinkSpinner className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-surface" />
                 </Link>
-                <PriorityMark priority={t.priority} />
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium line-clamp-2 leading-snug">{t.title}{t.parentId && <DependencyPill className="ml-1.5 align-middle" />}</div>
-                  <div className="text-[11px] text-ink-3">{fmtDateTime(t.deadline, now)}</div>
+                <span className="flex justify-center"><PriorityMark priority={t.priority} /></span>
+                <div className="min-w-0">
+                  <div className="text-sm font-medium truncate">{t.title}</div>
+                  <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-ink-3 leading-5 min-w-0">
+                    {t.parentId && <DependencyPill />}
+                    <span className="truncate">{fmtDateTime(t.deadline, now)}</span>
+                  </div>
                 </div>
-                <OwnerList users={owners} size="xs" className="hidden sm:inline-flex max-w-[220px] justify-end" />
-                <HealthPill health={h} label={d.label} />
-                <ArrowRight className="size-3.5 text-ink-3 shrink-0" />
+                <span className="flex justify-end md:justify-start"><HealthPill health={h} label={d.label} /></span>
               </li>
             );
           })}
