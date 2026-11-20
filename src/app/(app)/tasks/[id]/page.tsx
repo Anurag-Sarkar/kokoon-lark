@@ -78,7 +78,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
 
           <section className="card p-5 sm:p-6">
             <h2 className="flex items-center gap-2 text-sm font-semibold mb-3"><ListChecks className="size-4 text-ink-3" />Subtasks</h2>
-            <SubtaskList task={task} subtasks={task.subtasks} users={users} canEdit={canEdit} />
+            <SubtaskList task={task} subtasks={task.subtasks} users={users} canEdit={canEdit} now={now.toISOString()} />
           </section>
 
           <section className="card p-5 sm:p-6">

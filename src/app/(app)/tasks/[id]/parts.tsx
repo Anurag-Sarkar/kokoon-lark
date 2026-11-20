@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CalendarClock, Check, Pencil, Plus, Trash2, Users, X } from "lucide-react";
-import { addComment, addSubtask, changeDeadline, deleteTask, removeSubtask, renameSubtask, setAssignees, setTaskStatus, toggleSubtask, updateTaskDetails } from "@/lib/actions";
-import { localInputToIso, toDatetimeLocal } from "@/lib/format";
+import { addComment, addSubtask, changeDeadline, deleteTask, removeSubtask, setAssignees, setTaskStatus, toggleSubtask, updateSubtask, updateTaskDetails } from "@/lib/actions";
+import { fmtShortDateTime, localInputToIso, toDatetimeLocal } from "@/lib/format";
 import { PRIORITIES, PRIORITY_LABEL, STATUSES, STATUS_LABEL, type Priority, type Status, type SubtaskDTO, type TaskDTO, type UserDTO } from "@/lib/types";
 import { useAction } from "@/components/useAction";
 import { Modal } from "@/components/ui/Modal";
@@ -114,13 +114,29 @@ export function AssigneeEditor({ task, users, canEdit, currentUserId }: { task: 
 
 /* ---------------- Subtasks ---------------- */
 
-export function SubtaskList({ task, subtasks, users, canEdit }: { task: TaskDTO; subtasks: SubtaskDTO[]; users: UserDTO[]; canEdit: boolean }) {
+/**
+ * A subtask's planned date, as a quiet note. It is a plan for pacing the work, never a deadline:
+ * nothing is scored or flagged on it. A plan that has passed on an open step shows in amber as a nudge.
+ */
+function PlanNote({ s, now }: { s: SubtaskDTO; now: string }) {
+  if (!s.plannedFor) return null;
+  const slipped = !s.isDone && new Date(s.plannedFor).getTime() < new Date(now).getTime();
+  return (
+    <span className={`inline-flex items-center gap-1 text-[11px] whitespace-nowrap ${slipped ? "text-warn-text font-semibold" : "text-ink-3"}`} title={slipped ? "Planned for earlier than now; only the task deadline counts" : "Planned for; only the task deadline counts"}>
+      <CalendarClock className="size-3" aria-hidden />{slipped ? "planned for " : "by "}{fmtShortDateTime(s.plannedFor)}
+    </span>
+  );
+}
+
+export function SubtaskList({ task, subtasks, users, canEdit, now }: { task: TaskDTO; subtasks: SubtaskDTO[]; users: UserDTO[]; canEdit: boolean; /** ISO, from the server, so past/future reads the same on both ends */ now: string }) {
   const [title, setTitle] = useState("");
-  const [editing, setEditing] = useState<{ id: string; title: string } | null>(null);
+  const [plannedFor, setPlannedFor] = useState("");
+  const [editing, setEditing] = useState<{ id: string; title: string; plannedFor: string } | null>(null);
   const { run, pending, error } = useAction();
   const done = subtasks.filter((s) => s.isDone).length;
   const pctv = subtasks.length ? Math.round((done / subtasks.length) * 100) : 0;
   const byId = new Map(users.map((u) => [u.id, u]));
+  const maxPlan = toDatetimeLocal(task.deadline);
   return (
     <div className="grid gap-3">
       {subtasks.length > 0 && (
@@ -135,8 +151,9 @@ export function SubtaskList({ task, subtasks, users, canEdit }: { task: TaskDTO;
           if (editing?.id === s.id) {
             return (
               <li key={s.id} className="rounded-lg px-2 py-1.5 bg-surface-2">
-                <form className="flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); if (!editing.title.trim()) return; run(() => renameSubtask(task.id, s.id, editing.title), () => setEditing(null)); }}>
-                  <input value={editing.title} onChange={(e) => setEditing({ id: s.id, title: e.target.value })} onKeyDown={(e) => { if (e.key === "Escape") setEditing(null); }} className="input h-9" aria-label="Subtask title" maxLength={200} autoFocus />
+                <form className="grid grid-cols-[minmax(0,1fr)_auto_auto] sm:grid-cols-[minmax(0,1fr)_12.5rem_auto_auto] gap-2 items-center" onSubmit={(e) => { e.preventDefault(); if (!editing.title.trim()) return; run(() => updateSubtask(task.id, s.id, { title: editing.title, plannedFor: localInputToIso(editing.plannedFor) }), () => setEditing(null)); }}>
+                  <input value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} onKeyDown={(e) => { if (e.key === "Escape") setEditing(null); }} className="input h-9" aria-label="Subtask title" maxLength={200} autoFocus />
+                  <input type="datetime-local" value={editing.plannedFor} max={maxPlan} onChange={(e) => setEditing({ ...editing, plannedFor: e.target.value })} onKeyDown={(e) => { if (e.key === "Escape") setEditing(null); }} className="input h-9 order-last col-span-3 sm:order-none sm:col-span-1" aria-label="Planned for (optional)" title="Plan to have this step done by (optional)" />
                   <button type="submit" className="btn btn-secondary btn-sm" disabled={pending || !editing.title.trim()}><Check className="size-3.5" />Save</button>
                   <button type="button" className="btn btn-ghost btn-sm px-2" onClick={() => setEditing(null)} aria-label="Cancel"><X className="size-4" /></button>
                 </form>
@@ -146,11 +163,14 @@ export function SubtaskList({ task, subtasks, users, canEdit }: { task: TaskDTO;
           return (
             <li key={s.id} className="group flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-surface-2">
               <input type="checkbox" checked={s.isDone} disabled={!canEdit || pending} onChange={(e) => run(() => toggleSubtask(task.id, s.id, e.target.checked))} className="accent-ink size-4" aria-label={s.title} />
-              <span className={`flex-1 text-sm ${s.isDone ? "line-through text-ink-3" : ""}`}>{s.title}</span>
+              <span className="flex-1 min-w-0 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                <span className={`text-sm ${s.isDone ? "line-through text-ink-3" : ""}`}>{s.title}</span>
+                <PlanNote s={s} now={now} />
+              </span>
               {who && <Link href={personHref(who.id)} className="shrink-0" title={`Done by ${who.name}`}><Avatar user={who} size="xs" /></Link>}
               {canEdit && (
                 <span className="inline-flex items-center sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
-                  <button type="button" onClick={() => setEditing({ id: s.id, title: s.title })} className="btn btn-ghost btn-xs px-1" aria-label="Edit subtask"><Pencil className="size-3.5" /></button>
+                  <button type="button" onClick={() => setEditing({ id: s.id, title: s.title, plannedFor: s.plannedFor ? toDatetimeLocal(s.plannedFor) : "" })} className="btn btn-ghost btn-xs px-1" aria-label="Edit subtask"><Pencil className="size-3.5" /></button>
                   <button type="button" onClick={() => run(() => removeSubtask(task.id, s.id))} className="btn btn-ghost btn-xs px-1" aria-label="Remove subtask"><Trash2 className="size-3.5" /></button>
                 </span>
               )}
@@ -160,11 +180,13 @@ export function SubtaskList({ task, subtasks, users, canEdit }: { task: TaskDTO;
         {subtasks.length === 0 && <li className="text-xs text-ink-3 px-2">No subtasks yet. Break the work down so progress is visible.</li>}
       </ul>
       {canEdit && (
-        <form className="flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); if (!title.trim()) return; run(() => addSubtask(task.id, title), () => setTitle("")); }}>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} className="input h-9" placeholder="Add a subtask and press Enter" />
+        <form className="grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1fr)_12.5rem_auto] gap-2 items-center" onSubmit={(e) => { e.preventDefault(); if (!title.trim()) return; run(() => addSubtask(task.id, title, localInputToIso(plannedFor)), () => { setTitle(""); setPlannedFor(""); }); }}>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} className="input h-9" placeholder="Add a subtask and press Enter" maxLength={200} />
+          <input type="datetime-local" value={plannedFor} max={maxPlan} onChange={(e) => setPlannedFor(e.target.value)} className="input h-9 order-last col-span-2 sm:order-none sm:col-span-1" aria-label="Planned for (optional)" title="Plan to have this step done by (optional)" />
           <button type="submit" className="btn btn-secondary btn-sm" disabled={pending || !title.trim()}><Plus className="size-3.5" />Add</button>
         </form>
       )}
+      {canEdit && <p className="text-[11px] text-ink-3 px-2">A date on a step is a plan for pacing the work, not a deadline. Only the task's deadline counts.</p>}
       <ErrorLine error={error} />
     </div>
   );

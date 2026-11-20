@@ -50,6 +50,8 @@ export interface SubtaskDTO {
   id: string;
   title: string;
   isDone: boolean;
+  /** a plan for when this step should be done (ISO); not a deadline, never scored */
+  plannedFor: string | null;
   completedAt: string | null;
   completedBy: string | null;
   createdAt: string;

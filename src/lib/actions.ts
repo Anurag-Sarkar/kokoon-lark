@@ -120,7 +120,6 @@ export async function createTask(_prev: FormState, formData: FormData): Promise<
   const deadline = parseDeadline(String(formData.get("deadline") ?? ""));
   const assignees = formData.getAll("assignees").map(String).filter(isValidId);
   const tags = parseTags(String(formData.get("tags") ?? ""));
-  const subtaskTitles = formData.getAll("subtasks").map((s) => String(s).trim()).filter(Boolean);
 
   if (title.length < 2) return { error: "Give the task a title." };
   if (title.length > 200) return { error: "Title is too long (200 characters max)." };
@@ -128,9 +127,43 @@ export async function createTask(_prev: FormState, formData: FormData): Promise<
   if (!deadline) return { error: "Every task needs a deadline." };
   if (assignees.length === 0) return { error: "Assign the task to at least one person." };
 
+  // Subtasks arrive as two parallel lists: a title and an optional planned date per row.
+  const subtaskTitles = formData.getAll("subtasks").map(String);
+  const subtaskPlans = formData.getAll("subtaskPlans").map(String);
+  const subtasks: { title: string; plannedFor: Date | null }[] = [];
+  for (let i = 0; i < subtaskTitles.length; i++) {
+    const t = subtaskTitles[i].trim();
+    if (!t) continue;
+    if (t.length > 200) return { error: "A subtask title is too long (200 characters max)." };
+    const raw = subtaskPlans[i] ?? "";
+    const plannedFor = raw ? parseDeadline(raw) : null;
+    if (raw && !plannedFor) return { error: `The date on subtask "${t}" isn't valid.` };
+    if (plannedFor && plannedFor.getTime() > deadline.getTime()) return { error: `Subtask "${t}" is planned for after the deadline. A plan has to fit inside the task's deadline.` };
+    subtasks.push({ title: t, plannedFor });
+  }
+
+  // Dependencies come as one JSON field built on the client; every one is checked before anything is created.
+  let depInputs: DependencyInput[] = [];
+  const depsRaw = String(formData.get("dependencies") ?? "").trim();
+  if (depsRaw) {
+    try {
+      const parsed: unknown = JSON.parse(depsRaw);
+      if (Array.isArray(parsed)) depInputs = parsed as DependencyInput[];
+    } catch {
+      return { error: "The dependencies couldn't be read. Remove them and try again." };
+    }
+  }
+
   await connectDB();
   const validUsers = await User.find({ _id: { $in: assignees }, active: { $ne: false } }).select("_id").lean();
   if (validUsers.length !== assignees.length) return { error: "One of the assignees no longer exists." };
+
+  const deps: PreparedDependency[] = [];
+  for (const input of depInputs) {
+    const prepared = await prepareDependency(input, deadline);
+    if (typeof prepared === "string") return { error: prepared };
+    deps.push(prepared);
+  }
 
   const names = (await User.find({ _id: { $in: assignees } }).select("name").lean()).map((u) => u.name);
   const created = await Task.create({
@@ -143,13 +176,14 @@ export async function createTask(_prev: FormState, formData: FormData): Promise<
     createdBy: new Types.ObjectId(user.id),
     assignees: assignees.map((a) => new Types.ObjectId(a)),
     tags,
-    subtasks: subtaskTitles.map((t) => ({ title: t })),
+    subtasks,
     activity: [
       activity(user.id, "created", `Created the task and assigned it to ${names.join(", ")}. Deadline ${fmtShortDateTime(deadline.toISOString())}.`),
     ],
   });
 
   await notifyAssigned(created, assignees, user, names);
+  for (const dep of deps) await insertDependency(created, dep, user);
   revalidateAll();
   redirect(`/tasks/${created._id.toString()}`);
 }
@@ -375,15 +409,27 @@ export async function setAssignees(taskId: string, userIds: string[]): Promise<A
   return { ok: true };
 }
 
-export async function addSubtask(taskId: string, title: string): Promise<ActionResult> {
+/** A subtask's planned date: "" clears it; otherwise it must parse and fit inside the task's deadline. */
+function parsePlannedFor(raw: string, task: Pick<TaskDoc, "deadline">): Date | null | string {
+  if (!raw) return null;
+  const d = parseDeadline(raw);
+  if (!d) return "That date isn't valid.";
+  if (d.getTime() > new Date(task.deadline).getTime()) return `A plan has to fit inside the task's deadline, ${fmtShortDateTime(new Date(task.deadline).toISOString())}.`;
+  return d;
+}
+
+export async function addSubtask(taskId: string, title: string, plannedForRaw = ""): Promise<ActionResult> {
   const user = await requireActor();
   const task = await loadEditableTask(taskId, user);
   if (typeof task === "string") return fail(task);
   const t = title.trim();
   if (!t) return fail("Subtask needs a title.");
+  if (t.length > 200) return fail("Subtask title is too long (200 characters max).");
+  const plannedFor = parsePlannedFor(plannedForRaw, task);
+  if (typeof plannedFor === "string") return fail(plannedFor);
   await Task.updateOne(
     { _id: task._id },
-    { $push: { subtasks: { title: t }, activity: activity(user.id, "subtask_added", `Added subtask "${t}".`) } }
+    { $push: { subtasks: { title: t, plannedFor }, activity: activity(user.id, "subtask_added", `Added subtask "${t}"${plannedFor ? `, planned for ${fmtShortDateTime(plannedFor.toISOString())}` : ""}.`) } }
   );
   revalidateAll();
   return { ok: true };
@@ -411,19 +457,27 @@ export async function toggleSubtask(taskId: string, subtaskId: string, done: boo
   return { ok: true };
 }
 
-export async function renameSubtask(taskId: string, subtaskId: string, title: string): Promise<ActionResult> {
+/** Change a subtask's title and its planned date ("" clears the date). */
+export async function updateSubtask(taskId: string, subtaskId: string, input: { title: string; plannedFor: string }): Promise<ActionResult> {
   const user = await requireActor();
   const task = await loadEditableTask(taskId, user);
   if (typeof task === "string") return fail(task);
-  const t = title.trim();
+  const t = input.title.trim();
   if (!t) return fail("Subtask needs a title.");
   if (t.length > 200) return fail("Subtask title is too long (200 characters max).");
   const sub = task.subtasks.find((s) => s._id.toString() === subtaskId);
   if (!sub) return fail("Subtask not found.");
-  if (sub.title === t) return { ok: true };
+  const plannedFor = parsePlannedFor(input.plannedFor, task);
+  if (typeof plannedFor === "string") return fail(plannedFor);
+  const was = sub.plannedFor ? new Date(sub.plannedFor).getTime() : null;
+  const now = plannedFor ? plannedFor.getTime() : null;
+  const notes: string[] = [];
+  if (sub.title !== t) notes.push(`Renamed subtask "${sub.title}" to "${t}".`);
+  if (was !== now) notes.push(plannedFor ? `Planned subtask "${t}" for ${fmtShortDateTime(plannedFor.toISOString())}.` : `Removed the planned date from subtask "${t}".`);
+  if (notes.length === 0) return { ok: true };
   await Task.updateOne(
     { _id: task._id, "subtasks._id": sub._id },
-    { $set: { "subtasks.$.title": t }, $push: { activity: activity(user.id, "subtask_edited", `Renamed subtask "${sub.title}" to "${t}".`) } }
+    { $set: { "subtasks.$.title": t, "subtasks.$.plannedFor": plannedFor }, $push: { activity: activity(user.id, "subtask_edited", notes.join(" ")) } }
   );
   revalidateAll();
   return { ok: true };
@@ -480,48 +534,59 @@ export type CreateResult = { ok: true; id: string } | { ok: false; error: string
  * Adds a dependency: a real task, owned by other people with its own deadline, that feeds this one.
  * It shows up for its owners like any other task and counts in their ownership score the same way.
  */
-export async function createDependency(
-  parentId: string,
-  input: { title: string; description: string; deadline: string; assigneeIds: string[] }
-): Promise<CreateResult> {
+export interface DependencyInput { title: string; description: string; deadline: string; assigneeIds: string[] }
+interface PreparedDependency { title: string; description: string; deadline: Date; ids: string[]; names: string[] }
+
+/** Checks a dependency's fields against the task it will feed, without creating anything. Returns the problem as a string. */
+async function prepareDependency(input: DependencyInput, parentDeadline: Date): Promise<PreparedDependency | string> {
+  const title = String(input.title ?? "").trim();
+  if (title.length < 2) return "Give the dependency a title.";
+  if (title.length > 200) return `Dependency title "${title.slice(0, 40)}…" is too long (200 characters max).`;
+  const deadline = parseDeadline(String(input.deadline ?? ""));
+  if (!deadline) return `Pick a deadline for "${title}".`;
+  if (deadline.getTime() > parentDeadline.getTime()) {
+    return `A dependency has to land before the task it feeds. Pick a time on or before ${fmtShortDateTime(parentDeadline.toISOString())} for "${title}".`;
+  }
+  const ids = [...new Set((Array.isArray(input.assigneeIds) ? input.assigneeIds : []).map(String).filter(isValidId))];
+  if (ids.length === 0) return `Pick at least one person to own "${title}".`;
+  const owners = await User.find({ _id: { $in: ids }, active: { $ne: false } }).select("name").lean();
+  if (owners.length !== ids.length) return "One of those people isn't available.";
+  return { title, description: String(input.description ?? "").trim(), deadline, ids, names: owners.map((u) => u.name) };
+}
+
+/** Creates the dependency as a task of its own, records it on the parent and tells its owners. */
+async function insertDependency(parent: Pick<TaskDoc, "_id" | "title" | "deadline" | "priority">, dep: PreparedDependency, user: UserDTO): Promise<string> {
+  const created = await Task.create({
+    title: dep.title,
+    description: dep.description,
+    priority: parent.priority,
+    status: "todo",
+    deadline: dep.deadline,
+    originalDeadline: dep.deadline,
+    createdBy: oid(user.id),
+    parentId: parent._id,
+    assignees: dep.ids.map(oid),
+    tags: [],
+    activity: [activity(user.id, "created", `Created this as a dependency of "${parent.title}" and assigned it to ${dep.names.join(", ")}. Deadline ${fmtShortDateTime(dep.deadline.toISOString())}.`)],
+  });
+  await Task.updateOne(
+    { _id: parent._id },
+    { $push: { activity: activity(user.id, "dependency_added", `Added dependency "${dep.title}" for ${dep.names.join(", ")}, due ${fmtShortDateTime(dep.deadline.toISOString())}.`) } }
+  );
+  await notifyDependency(created, parent, dep.ids, user, dep.names);
+  return created._id.toString();
+}
+
+export async function createDependency(parentId: string, input: DependencyInput): Promise<CreateResult> {
   const user = await requireActor();
   const parent = await loadEditableTask(parentId, user);
   if (typeof parent === "string") return { ok: false, error: parent };
   if (parent.status === "done") return { ok: false, error: "This task is already done, so it can't take new dependencies." };
-  const title = input.title.trim();
-  if (title.length < 2) return { ok: false, error: "Give the dependency a title." };
-  if (title.length > 200) return { ok: false, error: "Title is too long (200 characters max)." };
-  const deadline = parseDeadline(input.deadline);
-  if (!deadline) return { ok: false, error: "Pick a deadline for it." };
-  if (deadline.getTime() > new Date(parent.deadline).getTime()) {
-    return { ok: false, error: `A dependency has to land before the task it feeds. Pick a time on or before ${fmtShortDateTime(new Date(parent.deadline).toISOString())}.` };
-  }
-  const ids = [...new Set(input.assigneeIds.filter(isValidId))];
-  if (ids.length === 0) return { ok: false, error: "Pick at least one person to own it." };
-  const owners = await User.find({ _id: { $in: ids }, active: { $ne: false } }).select("name").lean();
-  if (owners.length !== ids.length) return { ok: false, error: "One of those people isn't available." };
-  const names = owners.map((u) => u.name);
-
-  const created = await Task.create({
-    title,
-    description: input.description.trim(),
-    priority: parent.priority,
-    status: "todo",
-    deadline,
-    originalDeadline: deadline,
-    createdBy: oid(user.id),
-    parentId: parent._id,
-    assignees: ids.map(oid),
-    tags: [],
-    activity: [activity(user.id, "created", `Created this as a dependency of "${parent.title}" and assigned it to ${names.join(", ")}. Deadline ${fmtShortDateTime(deadline.toISOString())}.`)],
-  });
-  await Task.updateOne(
-    { _id: parent._id },
-    { $push: { activity: activity(user.id, "dependency_added", `Added dependency "${title}" for ${names.join(", ")}, due ${fmtShortDateTime(deadline.toISOString())}.`) } }
-  );
-  await notifyDependency(created, parent, ids, user, names);
+  const prepared = await prepareDependency(input, new Date(parent.deadline));
+  if (typeof prepared === "string") return { ok: false, error: prepared };
+  const id = await insertDependency(parent, prepared, user);
   revalidateAll();
-  return { ok: true, id: created._id.toString() };
+  return { ok: true, id };
 }
 
 /* ---------------- integrity flags ---------------- */

@@ -63,6 +63,8 @@ export interface SubtaskDoc {
   _id: Types.ObjectId;
   title: string;
   isDone: boolean;
+  /** when this step should be done, as a plan for pacing the work; never a deadline and never scored */
+  plannedFor: Date | null;
   completedAt: Date | null;
   completedBy: Types.ObjectId | null;
   createdAt: Date;
@@ -218,6 +220,7 @@ TeamSchema.index({ owner: 1 });
 const SubtaskSchema = new Schema<SubtaskDoc>({
   title: { type: String, required: true, trim: true },
   isDone: { type: Boolean, default: false },
+  plannedFor: { type: Date, default: null },
   completedAt: { type: Date, default: null },
   completedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
   createdAt: { type: Date, default: () => new Date() },

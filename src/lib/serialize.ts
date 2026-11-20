@@ -51,6 +51,7 @@ export function toTaskDTO(t: TaskDoc): TaskDTO {
       id: s._id.toString(),
       title: s.title,
       isDone: !!s.isDone,
+      plannedFor: iso(s.plannedFor),
       completedAt: iso(s.completedAt),
       completedBy: s.completedBy ? s.completedBy.toString() : null,
       createdAt: isoReq(s.createdAt),
