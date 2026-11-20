@@ -1,5 +1,5 @@
 import mongoose, { Schema, Types, type Model } from "mongoose";
-import type { ActivityType, DeadlineRequestStatus, Priority, Role, Status } from "./types";
+import type { ActivityType, BulletinStatus, DeadlineRequestStatus, Priority, Role, Status } from "./types";
 
 /* ---------- Raw document shapes (what .lean() returns) ---------- */
 
@@ -138,6 +138,8 @@ export interface TaskDoc {
   originalDeadline: Date;
   createdBy: Types.ObjectId;
   parentId: Types.ObjectId | null;
+  /** Set when this task was picked up from the bulletin board */
+  bulletinId: Types.ObjectId | null;
   assignees: Types.ObjectId[];
   tags: string[];
   completedAt: Date | null;
@@ -149,6 +151,29 @@ export interface TaskDoc {
   reminders: ReminderDoc[];
   comments: CommentDoc[];
   activity: ActivityDoc[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * A note on the bulletin board: work that needs doing but has no owner and no deadline yet.
+ * Anyone can pick it up; that creates a real task for them with the deadline they choose, and the
+ * post keeps pointing at that task.
+ */
+export interface BulletinPostDoc {
+  _id: Types.ObjectId;
+  title: string;
+  description: string;
+  /** the poster's suggestion; the person picking it up chooses the task's priority */
+  priority: Priority;
+  tags: string[];
+  /** when the poster would ideally like it done; a hint, never a deadline */
+  wantedBy: Date | null;
+  postedBy: Types.ObjectId;
+  status: BulletinStatus;
+  pickedBy: Types.ObjectId | null;
+  pickedAt: Date | null;
+  taskId: Types.ObjectId | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -297,6 +322,7 @@ const TaskSchema = new Schema<TaskDoc>(
     originalDeadline: { type: Date, required: true },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     parentId: { type: Schema.Types.ObjectId, ref: "Task", default: null },
+    bulletinId: { type: Schema.Types.ObjectId, ref: "BulletinPost", default: null },
     assignees: [{ type: Schema.Types.ObjectId, ref: "User" }],
     tags: [{ type: String }],
     completedAt: { type: Date, default: null },
@@ -317,6 +343,24 @@ TaskSchema.index({ createdBy: 1 });
 TaskSchema.index({ "deadlineRequests.status": 1 });
 TaskSchema.index({ parentId: 1 });
 
+const BulletinPostSchema = new Schema<BulletinPostDoc>(
+  {
+    title: { type: String, required: true, trim: true },
+    description: { type: String, default: "" },
+    priority: { type: String, enum: ["low", "medium", "high", "urgent"], default: "medium" },
+    tags: [{ type: String }],
+    wantedBy: { type: Date, default: null },
+    postedBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    status: { type: String, enum: ["open", "picked"], default: "open" },
+    pickedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    pickedAt: { type: Date, default: null },
+    taskId: { type: Schema.Types.ObjectId, ref: "Task", default: null },
+  },
+  { timestamps: true }
+);
+BulletinPostSchema.index({ status: 1, createdAt: -1 });
+BulletinPostSchema.index({ taskId: 1 });
+
 /* ---------- Models (HMR-safe) ---------- */
 
 export const User: Model<UserDoc> =
@@ -335,6 +379,10 @@ export const Team: Model<TeamDoc> =
 export const PushSubscription: Model<PushSubscriptionDoc> =
   (mongoose.models.PushSubscription as Model<PushSubscriptionDoc>) ??
   mongoose.model<PushSubscriptionDoc>("PushSubscription", PushSubscriptionSchema);
+
+export const BulletinPost: Model<BulletinPostDoc> =
+  (mongoose.models.BulletinPost as Model<BulletinPostDoc>) ??
+  mongoose.model<BulletinPostDoc>("BulletinPost", BulletinPostSchema);
 
 export const AuthToken: Model<AuthTokenDoc> =
   (mongoose.models.AuthToken as Model<AuthTokenDoc>) ?? mongoose.model<AuthTokenDoc>("AuthToken", AuthTokenSchema);

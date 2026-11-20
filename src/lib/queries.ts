@@ -1,8 +1,8 @@
 import { Types } from "mongoose";
 import { connectDB } from "./mongodb";
-import { Task, Team, User } from "./models";
-import { toTaskDTO, toTeamDTO, toUserDTO } from "./serialize";
-import type { TaskDTO, TeamDTO, UserDTO } from "./types";
+import { BulletinPost, Task, Team, User } from "./models";
+import { toBulletinPostDTO, toTaskDTO, toTeamDTO, toUserDTO } from "./serialize";
+import type { BulletinPostDTO, TaskDTO, TeamDTO, UserDTO } from "./types";
 
 export const isValidId = (id: string): boolean => Types.ObjectId.isValid(id) && String(new Types.ObjectId(id)) === id;
 
@@ -68,6 +68,36 @@ export async function getTask(id: string): Promise<TaskDTO | null> {
   await connectDB();
   const t = await Task.findById(id).lean();
   return t ? toTaskDTO(t) : null;
+}
+
+export async function listTasksByIds(ids: string[]): Promise<TaskDTO[]> {
+  const valid = ids.filter(isValidId);
+  if (valid.length === 0) return [];
+  await connectDB();
+  const tasks = await Task.find({ _id: { $in: valid.map((id) => new Types.ObjectId(id)) } }).lean();
+  return tasks.map(toTaskDTO);
+}
+
+/** Open posts newest first, then the most recently picked-up ones (capped, so the board stays a board and not an archive). */
+export async function listBulletinPosts(pickedLimit = 20): Promise<{ open: BulletinPostDTO[]; picked: BulletinPostDTO[] }> {
+  await connectDB();
+  const [open, picked] = await Promise.all([
+    BulletinPost.find({ status: "open" }).sort({ createdAt: -1 }).lean(),
+    BulletinPost.find({ status: "picked" }).sort({ pickedAt: -1 }).limit(pickedLimit).lean(),
+  ]);
+  return { open: open.map(toBulletinPostDTO), picked: picked.map(toBulletinPostDTO) };
+}
+
+export async function countOpenBulletinPosts(): Promise<number> {
+  await connectDB();
+  return BulletinPost.countDocuments({ status: "open" });
+}
+
+export async function getBulletinPost(id: string): Promise<BulletinPostDTO | null> {
+  if (!isValidId(id)) return null;
+  await connectDB();
+  const p = await BulletinPost.findById(id).lean();
+  return p ? toBulletinPostDTO(p) : null;
 }
 
 export function userMap(users: UserDTO[]): Map<string, UserDTO> {

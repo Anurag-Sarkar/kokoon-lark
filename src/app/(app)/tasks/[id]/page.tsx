@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, CalendarClock, GitBranch, History, Hourglass, MessageSquare, ListChecks, ShieldAlert } from "lucide-react";
+import { ArrowLeft, CalendarClock, GitBranch, History, Hourglass, MessageSquare, ListChecks, ShieldAlert, StickyNote } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { getTask, listChildTasks, listTeams, listUsers, userMap } from "@/lib/queries";
 import { activeFlag, canFlag } from "@/lib/integrity";
@@ -68,6 +68,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
                   {pending && <span className="pill bg-accent-soft text-accent-deep"><Hourglass className="size-3.5" />Deadline change pending</span>}
                   {flag && <span className="pill bg-critical-soft text-critical-text"><ShieldAlert className="size-3.5" />Flagged: marked done but wasn't</span>}
                   {parent && <Link href={`/tasks/${parent.id}`} className="pill bg-violet-soft text-violet hover:underline" title="This task exists because another task is waiting on it"><GitBranch className="size-3.5" />Dependency · feeds {parent.title}</Link>}
+                  {task.bulletinId && <Link href="/bulletin" className="pill bg-violet-soft text-violet hover:underline" title="Picked up from the bulletin board"><StickyNote className="size-3.5" />From the bulletin board</Link>}
                 </div>
                 <h1 className="text-2xl font-semibold tracking-tight leading-tight">{task.title}</h1>
                 {task.description ? <p className="mt-3 text-sm text-ink-2 leading-relaxed whitespace-pre-wrap">{task.description}</p> : <p className="mt-3 text-sm text-ink-3 italic">No description.</p>}

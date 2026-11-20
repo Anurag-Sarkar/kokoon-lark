@@ -9,13 +9,13 @@ import { SESSION_COOKIE, destroySession, getCurrentUser, startSession } from "./
 import { INVITE_TTL_MS, issueToken } from "./tokens";
 import { appUrl, mailConfigured, sendMail } from "./mail";
 import { inviteEmail, tempPasswordEmail } from "./emails";
-import { notifyAssigned, notifyDeadlineDecision, notifyDeadlineRequest, notifyDependency, notifyFlagged } from "./notify";
+import { notifyAssigned, notifyBulletinPost, notifyDeadlineDecision, notifyDeadlineRequest, notifyDependency, notifyFlagged, notifyPickedUp } from "./notify";
 import { toTeamDTO, toUserDTO } from "./serialize";
 import { canReview, changesApplyDirectly, reviewerLabel, reviewersFor } from "./approvals";
 import { canFlag } from "./integrity";
 import { AVATAR_COLORS } from "./palette";
 import { connectDB } from "./mongodb";
-import { Task, Team, User, type TaskDoc } from "./models";
+import { BulletinPost, Task, Team, User, type BulletinPostDoc, type TaskDoc } from "./models";
 import { isValidId } from "./queries";
 import { PRIORITIES, STATUSES, STATUS_LABEL, type ActionResult, type ActivityType, type Priority, type Role, type Status, type UserDTO } from "./types";
 import { fmtShortDateTime, shiftLabel } from "./format";
@@ -522,6 +522,10 @@ export async function deleteTask(taskId: string): Promise<ActionResult> {
   if (user.role !== "admin" && task.createdBy.toString() !== user.id) return fail("Only the creator or an admin can delete a task.");
   await Task.deleteOne({ _id: task._id });
   await Task.updateMany({ parentId: task._id }, { $set: { parentId: null } }); // dependencies live on as ordinary tasks
+  if (task.bulletinId) {
+    // The work still needs doing: the post goes back on the board for someone else.
+    await BulletinPost.updateOne({ _id: task.bulletinId, taskId: task._id }, { $set: { status: "open", pickedBy: null, pickedAt: null, taskId: null } });
+  }
   revalidateAll();
   redirect("/tasks");
 }
@@ -587,6 +591,118 @@ export async function createDependency(parentId: string, input: DependencyInput)
   const id = await insertDependency(parent, prepared, user);
   revalidateAll();
   return { ok: true, id };
+}
+
+/* ---------------- bulletin board ---------------- */
+
+/**
+ * A post is work with no owner and no deadline. Anyone can put one up and anyone can pick one up;
+ * picking it up turns it into an ordinary task for that person with the deadline they choose.
+ */
+export interface BulletinInput { title: string; description: string; priority: Priority; tags: string; wantedBy: string }
+type ParsedPost = { title: string; description: string; priority: Priority; tags: string[]; wantedBy: Date | null };
+
+function parseBulletinInput(input: BulletinInput): ParsedPost | string {
+  const title = String(input.title ?? "").trim();
+  if (title.length < 2) return "Say what needs doing.";
+  if (title.length > 200) return "Title is too long (200 characters max).";
+  const description = String(input.description ?? "").trim();
+  if (description.length > 4000) return "Details are too long (4000 characters max).";
+  const priority = String(input.priority ?? "medium") as Priority;
+  if (!PRIORITIES.includes(priority)) return "Pick a valid priority.";
+  const rawWanted = String(input.wantedBy ?? "").trim();
+  const wantedBy = rawWanted ? parseDeadline(rawWanted) : null;
+  if (rawWanted && !wantedBy) return "That date isn't valid.";
+  return { title, description, priority, tags: parseTags(String(input.tags ?? "")), wantedBy };
+}
+
+export async function createBulletinPost(input: BulletinInput): Promise<CreateResult> {
+  const user = await requireActor();
+  const parsed = parseBulletinInput(input);
+  if (typeof parsed === "string") return { ok: false, error: parsed };
+  await connectDB();
+  const post = await BulletinPost.create({ ...parsed, postedBy: oid(user.id), status: "open" });
+  await notifyBulletinPost(post, user);
+  revalidateAll();
+  return { ok: true, id: post._id.toString() };
+}
+
+/** An open post this person may change: their own, or any for an admin. */
+async function loadOpenPost(postId: string, user: UserDTO): Promise<BulletinPostDoc | string> {
+  if (!isValidId(postId)) return "That post is no longer on the board.";
+  await connectDB();
+  const post = await BulletinPost.findById(postId).lean();
+  if (!post) return "That post is no longer on the board.";
+  if (post.status !== "open") return "Someone has already picked this up.";
+  if (post.postedBy.toString() !== user.id && user.role !== "admin") return "Only the person who posted this, or an admin, can change it.";
+  return post;
+}
+
+export async function updateBulletinPost(postId: string, input: BulletinInput): Promise<ActionResult> {
+  const user = await requireActor();
+  const post = await loadOpenPost(postId, user);
+  if (typeof post === "string") return fail(post);
+  const parsed = parseBulletinInput(input);
+  if (typeof parsed === "string") return fail(parsed);
+  // Guarded on the status, so an edit can't land on a post that was picked up a moment ago.
+  const res = await BulletinPost.updateOne({ _id: post._id, status: "open" }, { $set: parsed });
+  if (res.matchedCount === 0) return fail("Someone has already picked this up.");
+  revalidateAll();
+  return { ok: true };
+}
+
+export async function removeBulletinPost(postId: string): Promise<ActionResult> {
+  const user = await requireActor();
+  const post = await loadOpenPost(postId, user);
+  if (typeof post === "string") return fail(post);
+  const res = await BulletinPost.deleteOne({ _id: post._id, status: "open" });
+  if (res.deletedCount === 0) return fail("Someone has already picked this up.");
+  revalidateAll();
+  return { ok: true };
+}
+
+/**
+ * Picks a post up: it becomes a real task owned by this person, with the deadline and priority they
+ * choose, and the post keeps pointing at it. The claim is atomic on the post's status, so two people
+ * tapping at the same moment can't both end up with it.
+ */
+export async function pickUpBulletinPost(postId: string, input: { deadline: string; priority: Priority }): Promise<CreateResult> {
+  const user = await requireActor();
+  if (!isValidId(postId)) return { ok: false, error: "That post is no longer on the board." };
+  const deadline = parseDeadline(String(input.deadline ?? ""));
+  if (!deadline) return { ok: false, error: "Pick a deadline: it's your task from here." };
+  if (!PRIORITIES.includes(input.priority)) return { ok: false, error: "Pick a valid priority." };
+  await connectDB();
+  const post = await BulletinPost.findById(postId).lean();
+  if (!post) return { ok: false, error: "That post is no longer on the board." };
+  if (post.status !== "open") return { ok: false, error: "Someone has already picked this up." };
+  const poster = await User.findById(post.postedBy).select("name").lean();
+  const posterName = poster?.name ?? "someone";
+
+  const created = await Task.create({
+    title: post.title,
+    description: post.description,
+    priority: input.priority,
+    status: "todo",
+    deadline,
+    originalDeadline: deadline,
+    createdBy: oid(user.id),
+    bulletinId: post._id,
+    assignees: [oid(user.id)],
+    tags: post.tags ?? [],
+    activity: [activity(user.id, "created", `Picked this up from the bulletin board, where ${posterName} posted it. Deadline ${fmtShortDateTime(deadline.toISOString())}.`)],
+  });
+  const claimed = await BulletinPost.updateOne(
+    { _id: post._id, status: "open" },
+    { $set: { status: "picked", pickedBy: oid(user.id), pickedAt: new Date(), taskId: created._id } }
+  );
+  if (claimed.matchedCount === 0) {
+    await Task.deleteOne({ _id: created._id });
+    return { ok: false, error: "Someone picked this up a moment ago." };
+  }
+  await notifyPickedUp(created, post.postedBy.toString(), user);
+  revalidateAll();
+  return { ok: true, id: created._id.toString() };
 }
 
 /* ---------------- integrity flags ---------------- */

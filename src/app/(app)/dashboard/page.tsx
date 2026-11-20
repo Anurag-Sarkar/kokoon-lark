@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { format } from "date-fns";
-import { Hourglass, Plus } from "lucide-react";
+import { Hourglass, Plus, StickyNote } from "lucide-react";
 import { canReview, pendingDeadlineRequest } from "@/lib/approvals";
 import { requireUser } from "@/lib/auth";
-import { listAllTasks, listTeams, listUsers, userMap } from "@/lib/queries";
+import { countOpenBulletinPosts, listAllTasks, listTeams, listUsers, userMap } from "@/lib/queries";
 import { peerIds, teamsOf } from "@/lib/teams";
 import { computeUserStats } from "@/lib/stats";
 import { PageHeader, SectionTitle } from "@/components/shell/PageHeader";
@@ -19,7 +19,7 @@ import { pushConfigured } from "@/lib/push";
 export default async function DashboardPage() {
   const user = await requireUser();
   const now = new Date();
-  const [users, tasks, teams] = await Promise.all([listUsers(), listAllTasks(), listTeams()]);
+  const [users, tasks, teams, openPosts] = await Promise.all([listUsers(), listAllTasks(), listTeams(), countOpenBulletinPosts()]);
   const umap = userMap(users);
   const titles = new Map(tasks.map((t) => [t.id, t.title]));
   const stats = computeUserStats(user.id, tasks, now);
@@ -66,6 +66,17 @@ export default async function DashboardPage() {
             <div className="text-xs text-ink-3">Until it's approved, the current deadline is the one that counts.</div>
           </div>
           <span className="ml-auto text-xs font-semibold text-accent-deep whitespace-nowrap">See status →</span>
+        </Link>
+      )}
+
+      {openPosts > 0 && (
+        <Link href="/bulletin" className="card p-4 flex items-center gap-3 border-l-4 border-l-violet hover:border-line-2 transition">
+          <StickyNote className="size-5 text-violet shrink-0" />
+          <div className="min-w-0">
+            <div className="text-sm font-semibold">{openPosts} {openPosts === 1 ? "thing is" : "things are"} on the bulletin board, waiting for an owner</div>
+            <div className="text-xs text-ink-3">Pick one up and set your own deadline.</div>
+          </div>
+          <span className="ml-auto text-xs font-semibold text-accent-deep whitespace-nowrap">See the board →</span>
         </Link>
       )}
 

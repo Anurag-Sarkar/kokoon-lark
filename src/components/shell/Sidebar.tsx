@@ -2,16 +2,16 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { CalendarClock, ClipboardCheck, LayoutDashboard, ListTodo, LogOut, Plus, SquareKanban, UserCog, Users, UsersRound } from "lucide-react";
+import { CalendarClock, ClipboardCheck, LayoutDashboard, ListTodo, LogOut, Plus, SquareKanban, StickyNote, UserCog, Users, UsersRound } from "lucide-react";
 import { logout } from "@/lib/actions";
 import type { UserDTO } from "@/lib/types";
 import { Avatar } from "@/components/ui/Avatar";
 import { LinkSpinner } from "@/components/ui/LinkPending";
 
-type Item = { href: string; label: string; icon: React.ComponentType<{ className?: string }>; match: (path: string, view: string | null) => boolean; badge?: number };
+type Item = { href: string; label: string; icon: React.ComponentType<{ className?: string }>; match: (path: string, view: string | null) => boolean; badge?: number; /** what the badge counts, for screen readers */ badgeLabel?: string; badgeTone?: "accent" | "muted" };
 
-/** `approvals.show` is true for admins and team owners; `count` is how many requests wait on this person. */
-export function Sidebar({ user, approvals }: { user: UserDTO; approvals?: { show: boolean; count: number } }) {
+/** `approvals.show` is true for admins and team owners; `count` is how many requests wait on this person. `bulletin` is how many posts are up for grabs. */
+export function Sidebar({ user, approvals, bulletin = 0 }: { user: UserDTO; approvals?: { show: boolean; count: number }; bulletin?: number }) {
   const path = usePathname();
   const view = useSearchParams().get("view");
 
@@ -19,6 +19,7 @@ export function Sidebar({ user, approvals }: { user: UserDTO; approvals?: { show
     { href: "/dashboard", label: "My dashboard", icon: LayoutDashboard, match: (p) => p === "/dashboard" },
     { href: "/tasks", label: "Tasks", icon: ListTodo, match: (p, v) => p === "/tasks" && v !== "board" },
     { href: "/tasks?view=board", label: "Board", icon: SquareKanban, match: (p, v) => p === "/tasks" && v === "board" },
+    { href: "/bulletin", label: "Bulletin board", icon: StickyNote, match: (p) => p === "/bulletin", badge: bulletin, badgeLabel: "up for grabs", badgeTone: "muted" },
     ...(approvals?.show ? [{ href: "/approvals", label: "Approvals", icon: ClipboardCheck, match: (p: string) => p === "/approvals", badge: approvals.count } as Item] : []),
   ];
   const admin: Item[] = [
@@ -29,12 +30,12 @@ export function Sidebar({ user, approvals }: { user: UserDTO; approvals?: { show
   ];
 
   const render = (items: Item[]) =>
-    items.map(({ href, label, icon: Icon, match, badge }) => (
-      <Link key={href} href={href} className="nav-link" data-active={match(path, view)}>
+    items.map(({ href, label, icon: Icon, match, badge, badgeLabel = "waiting", badgeTone = "accent" }) => (
+      <Link key={href} href={href} className="nav-link group" data-active={match(path, view)}>
         <Icon className="size-4 shrink-0" />
         <span className="truncate">{label}</span>
         <span className="ml-auto inline-flex items-center gap-1.5">
-          {badge ? <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-accent text-white text-[10px] font-semibold tnum" aria-label={`${badge} waiting`}>{badge}</span> : null}
+          {badge ? <span className={`inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-[10px] font-semibold tnum ${badgeTone === "muted" ? "bg-line text-ink-2 group-data-[active=true]:bg-white/20 group-data-[active=true]:text-white" : "bg-accent text-white"}`} aria-label={`${badge} ${badgeLabel}`}>{badge}</span> : null}
           <LinkSpinner />
         </span>
       </Link>

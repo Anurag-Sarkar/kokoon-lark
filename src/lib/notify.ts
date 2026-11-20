@@ -2,7 +2,7 @@ import { Types } from "mongoose";
 import { connectDB } from "./mongodb";
 import { User, type TaskDoc } from "./models";
 import { appUrl, sendMail } from "./mail";
-import { assignedEmail, deadlineDecisionEmail, deadlineRequestEmail, dependencyEmail, flaggedEmail } from "./emails";
+import { assignedEmail, deadlineDecisionEmail, deadlineRequestEmail, dependencyEmail, flaggedEmail, pickedUpEmail } from "./emails";
 import { fmtShortDateTime, shiftLabel } from "./format";
 import { PRIORITY_LABEL } from "./types";
 import { sendPush } from "./push";
@@ -190,5 +190,38 @@ export async function notifyFlagged(task: Pick<TaskDoc, "_id" | "title">, ownerI
     await Promise.allSettled(users.map((u) => sendMail({ to: u.email, ...flaggedEmail({ name: u.name, byName: actor.name, taskTitle: task.title, reason, link }) })));
   } catch (err) {
     console.error("[notify] flag emails failed:", err);
+  }
+}
+
+/** Nudges everyone (push only, no email) that something new is on the bulletin board. Never throws. */
+export async function notifyBulletinPost(post: { title: string }, poster: { id: string; name: string }): Promise<void> {
+  try {
+    await connectDB();
+    const users = await User.find({ active: { $ne: false }, _id: { $ne: new Types.ObjectId(poster.id) } }).select("_id").lean();
+    await sendPush(users.map((u) => u._id.toString()), {
+      title: `${poster.name} posted to the bulletin board`,
+      body: `${post.title} · nobody owns it yet. Tap to pick it up.`,
+      url: "/bulletin",
+      tag: "bulletin",
+    });
+  } catch (err) {
+    console.error("[notify] bulletin push failed:", err);
+  }
+}
+
+/** Tells the poster that someone picked their post up and made it a task, by push and email. Never throws. */
+export async function notifyPickedUp(task: Pick<TaskDoc, "_id" | "title" | "deadline">, posterId: string, picker: { id: string; name: string }): Promise<void> {
+  if (posterId === picker.id) return;
+  const path = `/tasks/${task._id.toString()}`;
+  const deadlineLabel = fmtShortDateTime(new Date(task.deadline).toISOString());
+  await sendPush([posterId], { title: `${picker.name} picked up your post`, body: `${task.title} · due ${deadlineLabel}`, url: path, tag: `task-${task._id.toString()}` });
+  try {
+    const users = await mailableUsers([posterId], picker.id);
+    if (users.length === 0) return;
+    const link = `${await appUrl()}${path}`;
+    const u = users[0]!;
+    await sendMail({ to: u.email, ...pickedUpEmail({ name: u.name, byName: picker.name, title: task.title, deadlineLabel, link }) });
+  } catch (err) {
+    console.error("[notify] pick-up email failed:", err);
   }
 }

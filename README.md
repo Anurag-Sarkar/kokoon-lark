@@ -57,6 +57,10 @@ Production: `npm run build && npm start`. Set `MONGODB_URI` (and the email varia
 - The parent shows its dependencies with status and health, and a "still open" warning next to Mark done. In lists and on the board, a dependency says which task it feeds. Deleting a parent leaves its dependencies as ordinary tasks.
 - Deadlines stay consistent: a dependency can't be moved past the task it feeds, and a task can't be pulled in before an open dependency. Both are checked when a change is made or requested, and again when a request is approved.
 
+**Bulletin board**
+- A place for work that needs doing but has no owner yet. Anyone posts a note (what, optional details, a suggested priority, tags, and an *ideally by* hint that is not a deadline); everyone with push on gets a nudge. Anyone can **pick it up**: they set their own deadline and priority, and it becomes an ordinary task of theirs, with a *From the bulletin board* tag, counting in their ownership score like any other. The poster gets a push and an email saying who took it and when it is due.
+- Taking a post is atomic, so two people tapping at once can't both end up with it. The board shows what is up for grabs and the most recent pick-ups with the task's status; a post can be edited or removed by its poster (or an admin) only while it is still open, and if a picked-up task is deleted the post goes back on the board.
+
 **Integrity flags**
 - If someone marks a task done without the work being done, an admin or the owner's team owner can *Flag as not actually done* with a reason. The task is reopened, the owners are notified, and each active flag in the last 30 days takes 15 points off their ownership score (shown in the people table and on their page). Reviewers can clear a flag with a note once the work is real; a task's owners can never flag or clear their own.
 
@@ -172,7 +176,7 @@ src/app/(app)/people/[id]      a person's page; every name and avatar links here
 src/app/(app)/**/loading.tsx   per-route skeletons shown while a page loads
 src/components/ui/Skeleton.tsx, LinkPending.tsx   skeleton blocks and the in-link spinner
 src/app/{signup,forgot-password,reset-password,invite}   public auth pages
-src/lib/models.ts              Mongoose schemas (User, Session, Team, Task with embedded subtasks/comments/changes/activity)
+src/lib/models.ts              Mongoose schemas (User, Session, Team, Task with embedded subtasks/comments/changes/activity, BulletinPost)
 src/lib/actions.ts             task, people and team mutations (server actions) with permission checks
 src/lib/approvals.ts           who may move a deadline directly, who must ask, and who decides
 src/lib/integrity.ts           dependencies and "marked done but wasn't" flags, with the score penalty
@@ -183,6 +187,7 @@ src/lib/timezone.ts            APP_TIMEZONE handling and wall-clock helpers
 src/instrumentation.ts         server start hook: applies the timezone, starts the reminder scheduler
 src/app/api/reminders/run      runs one reminder sweep (admin session or CRON_SECRET)
 src/app/(app)/approvals        deadline requests waiting for the signed-in reviewer, and their own
+src/app/(app)/bulletin         bulletin board: unowned work anyone can post or pick up
 src/app/manifest.ts            web app manifest (PWA)
 public/sw.js, public/offline.html   service worker and offline fallback
 scripts/make-icons.mjs         renders the PWA icon set

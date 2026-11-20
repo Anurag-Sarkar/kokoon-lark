@@ -1,5 +1,5 @@
-import type { TaskDoc, TeamDoc, UserDoc } from "./models";
-import type { TaskDTO, TeamDTO, UserDTO } from "./types";
+import type { BulletinPostDoc, TaskDoc, TeamDoc, UserDoc } from "./models";
+import type { BulletinPostDTO, TaskDTO, TeamDTO, UserDTO } from "./types";
 
 const iso = (d: Date | null | undefined): string | null => (d ? new Date(d).toISOString() : null);
 const isoReq = (d: Date): string => new Date(d).toISOString();
@@ -43,6 +43,7 @@ export function toTaskDTO(t: TaskDoc): TaskDTO {
     originalDeadline: isoReq(t.originalDeadline ?? t.deadline),
     createdBy: t.createdBy.toString(),
     parentId: t.parentId ? t.parentId.toString() : null,
+    bulletinId: t.bulletinId ? t.bulletinId.toString() : null,
     assignees: (t.assignees ?? []).map((a) => a.toString()),
     tags: t.tags ?? [],
     completedAt: iso(t.completedAt),
@@ -101,5 +102,23 @@ export function toTaskDTO(t: TaskDoc): TaskDTO {
     })),
     createdAt: isoReq(t.createdAt),
     updatedAt: isoReq(t.updatedAt),
+  };
+}
+
+export function toBulletinPostDTO(p: BulletinPostDoc): BulletinPostDTO {
+  return {
+    id: p._id.toString(),
+    title: p.title,
+    description: p.description ?? "",
+    priority: p.priority ?? "medium",
+    tags: p.tags ?? [],
+    wantedBy: iso(p.wantedBy),
+    postedBy: p.postedBy.toString(),
+    status: p.status ?? "open",
+    pickedBy: p.pickedBy ? p.pickedBy.toString() : null,
+    pickedAt: iso(p.pickedAt),
+    taskId: p.taskId ? p.taskId.toString() : null,
+    createdAt: isoReq(p.createdAt),
+    updatedAt: isoReq(p.updatedAt),
   };
 }

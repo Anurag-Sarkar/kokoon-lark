@@ -186,3 +186,21 @@ export function dependencyEmail(p: { name: string; byName: string; taskTitle: st
     ),
   };
 }
+
+export function pickedUpEmail(p: { name: string; byName: string; title: string; deadlineLabel: string; link: string }): MailContent {
+  const first = p.name.split(" ")[0];
+  return {
+    subject: `${p.byName} picked up your post: ${p.title}`,
+    text: `Hi ${first},\n\n${p.byName} picked up "${p.title}" from the bulletin board. It's now their task, due ${p.deadlineLabel}, and it counts in their ownership score like any other.\n\nFollow it: ${p.link}\n\nYou can turn these emails off under Account in Kokoon Task.`,
+    html: layout(
+      `${esc(p.byName)} picked up your post`,
+      [
+        `Hi ${esc(first)},`,
+        `${esc(p.byName)} picked up <strong>${esc(p.title)}</strong> from the bulletin board. It's now their task, and it counts in their ownership score like any other.`,
+        `<span style="display:block;background:#f6f6f3;border-radius:10px;padding:12px 14px;font-size:14px">Their deadline: <strong>${esc(p.deadlineLabel)}</strong></span>`,
+      ],
+      { href: p.link, label: "Follow the task" },
+      "You can turn these emails off under Account in Kokoon Task."
+    ),
+  };
+}

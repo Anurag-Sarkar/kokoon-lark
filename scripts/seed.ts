@@ -1,7 +1,7 @@
 /* Seeds a realistic team with ~8 weeks of task history. Run: npm run seed */
 import bcrypt from "bcryptjs";
 import mongoose, { Types } from "mongoose";
-import { Session, Task, Team, User } from "../src/lib/models";
+import { BulletinPost, Session, Task, Team, User } from "../src/lib/models";
 
 const URI = process.env.MONGODB_URI ?? "mongodb://127.0.0.1:27017/kokoon-task";
 const NOW = new Date();
@@ -35,7 +35,7 @@ type Seed = {
 async function main() {
   await mongoose.connect(URI);
   console.log(`Connected to ${URI}`);
-  await Promise.all([User.deleteMany({}), Task.deleteMany({}), Team.deleteMany({}), Session.deleteMany({})]);
+  await Promise.all([User.deleteMany({}), Task.deleteMany({}), Team.deleteMany({}), Session.deleteMany({}), BulletinPost.deleteMany({})]);
 
   const pw = async (p: string) => bcrypt.hash(p, 10);
   const people = [

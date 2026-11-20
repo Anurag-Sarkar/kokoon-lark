@@ -144,6 +144,8 @@ export interface TaskDTO {
   createdBy: string;
   /** Set when this task is a dependency of another task */
   parentId: string | null;
+  /** Set when this task was picked up from the bulletin board */
+  bulletinId: string | null;
   assignees: string[];
   tags: string[];
   completedAt: string | null;
@@ -154,6 +156,28 @@ export interface TaskDTO {
   flags: FlagDTO[];
   comments: CommentDTO[];
   activity: ActivityDTO[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** open: waiting for someone · picked: now a task of its own, see taskId */
+export type BulletinStatus = "open" | "picked";
+
+/** A note on the bulletin board: work with no owner and no deadline until someone picks it up. */
+export interface BulletinPostDTO {
+  id: string;
+  title: string;
+  description: string;
+  /** the poster's suggestion; whoever picks it up chooses the task's priority */
+  priority: Priority;
+  tags: string[];
+  /** when the poster would ideally like it done (ISO); a hint, never a deadline */
+  wantedBy: string | null;
+  postedBy: string;
+  status: BulletinStatus;
+  pickedBy: string | null;
+  pickedAt: string | null;
+  taskId: string | null;
   createdAt: string;
   updatedAt: string;
 }
